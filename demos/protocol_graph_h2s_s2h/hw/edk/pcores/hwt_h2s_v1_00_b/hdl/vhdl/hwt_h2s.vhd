@@ -70,6 +70,10 @@ architecture implementation of hwt_h2s is
 	constant C_LOCAL_RAM_SIZE          : integer := 2048;
 	constant C_LOCAL_RAM_ADDRESS_WIDTH : integer := clog2(C_LOCAL_RAM_SIZE);
 	constant C_LOCAL_RAM_SIZE_IN_BYTES : integer := 4*C_LOCAL_RAM_SIZE;
+	
+	-- IMPORTANT: define maximum and minimum packet lengths here
+	constant C_MAX_PACKET_LEN : integer := 1500;
+	constant C_MIN_PACKET_LEN : integer := 64;
 
 	type LOCAL_MEMORY_T is array (0 to C_LOCAL_RAM_SIZE-1) of std_logic_vector(31 downto 0);
 	signal o_RAMAddr_sender : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
@@ -90,6 +94,13 @@ architecture implementation of hwt_h2s is
 	type testing_state_t is (T_STATE_INIT, T_STATE_RCV);
 	signal testing_state 	    : testing_state_t;
 	signal testing_state_next   : testing_state_t;
+	
+	type COUNTER_STATE_T is (STATE_WAIT, STATE_INCREMENT, STATE_DONE);
+	signal counter_state : COUNTER_STATE_T;
+	
+	signal packet_count      : integer range 0 to (C_LOCAL_RAM_SIZE_IN_BYTES/C_MIN_PACKET_LEN + 1);
+	signal local_base_addr   : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
+	signal packet_counter_en : std_logic;
 
 	type RECEIVING_STATE_TYPE_T is (STATE_IDLE, STATE_DST_IDP, STATE_DST_WRITE, STATE_RCV_1, STATE_RCV_2, 
 		STATE_RCV_3, STATE_RCV_4, STATE_EOF, STATE_WRITE_LEN, STATE_WRITE_LEN1, STATE_DONE
@@ -275,7 +286,7 @@ begin
 						meta_data(23)				 <= direction;
 						meta_data(22)				 <= latency_critical;
 						o_RAMData_sender  <= srcIDP;
-						o_RAMAddr_sender  <= "00000000001";
+						o_RAMAddr_sender  <= local_base_addr + 1;
 						o_RAMWE_sender  <= '1';
 						payload_count  <= 1;
 						payload(31 downto 24)  <= rx_ll_data;
@@ -285,7 +296,7 @@ begin
 				when STATE_DST_IDP  =>
 	   			write_step <= "0010";
 					o_RAMData_sender  <= dstIDP;
-					o_RAMAddr_sender  <= "00000000010";		
+					o_RAMAddr_sender  <= local_base_addr + 2;
 					o_RAMWE_sender  <= '1';
 					receiving_state  <= STATE_DST_WRITE;
 				when STATE_DST_WRITE  => 
@@ -356,7 +367,7 @@ begin
 				when STATE_EOF  => 
 					write_step <= "1000";
 					rx_ll_dst_rdy_local  <= '0'; 
-					o_RAMAddr_sender <= (others  => '0');
+					o_RAMAddr_sender <= local_base_addr;
 					o_RAMData_sender <= meta_data & std_logic_vector(to_unsigned(payload_count, 16));
 					o_RAMWE_sender <= '1';
 					payload_count  <= payload_count + 12;
@@ -429,6 +440,44 @@ begin
 	    end if;
 	end process;
 	
+	-- packet_counter_fsm keeps track of where in local RAM the next packet goes
+	-- and if we have space for more before flushing the buffer to shared memory
+	packet_counter_fsm: process (clk,rst,packet_counter_en) is
+	variable base_addr_tmp : unsigned(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
+	begin
+		if rst = '1' or packet_counter_en = '0' then
+			local_base_addr <= (others => '0');
+			packet_count <= 0;
+			counter_state <= STATE_WAIT;
+			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+		elsif rising_edge(clk) then
+			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			case counter_state is
+				-- wait for receiving_to_ram to do its job
+				when STATE_WAIT =>
+					-- receiving_to_ram_en <= '1'; -- @TODO: hook this up
+					if receiving_to_ram_done = '1' then
+						-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+						counter_state <= STATE_INCREMENT;
+					end if;
+				-- increment packet count and base address
+				when STATE_INCREMENT =>
+					packet_count <= packet_count + 1;
+					--always round up to the next word if it does not evenly divide
+					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count,C_LOCAL_RAM_ADDRESS_WIDTH)+3)/4);
+					local_base_addr <= std_logic_vector(base_addr_tmp);
+					if base_addr_tmp + C_MAX_PACKET_LEN/4 < base_addr_tmp then --base_addr wrapped around so our buffer can't fit another packet of max size
+						counter_state <= STATE_DONE;
+					else
+						counter_state <= STATE_WAIT;
+					end if;
+				when STATE_DONE =>
+				when others =>
+					counter_state <= STATE_WAIT;
+			end case;
+		end if;
+	end process;
+	
 	-- os and memory synchronisation state machine
 	reconos_fsm: process (clk,rst,o_osif,o_memif,o_ram) is
 		variable done  : boolean;
@@ -445,7 +494,8 @@ begin
 			base_addr_answer <= (others => '0');
 			reconos_fsm_ready <= '0';
 			reconos_step <= "000";
-			receiving_to_ram_en <= '0';
+			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
+			packet_counter_en <= '0'; -- @TODO: make sure to swap to_ram_en for couter_en
 		elsif rising_edge(clk) then
 			total_packet_len  <= std_logic_vector(to_unsigned(payload_count, 32));
 			data_ready <= '0';

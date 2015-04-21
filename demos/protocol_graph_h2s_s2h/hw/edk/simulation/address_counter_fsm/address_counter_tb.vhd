@@ -110,8 +110,8 @@ BEGIN
       wait for clk_period*2;
 		wait for 5 ns; --introduce some skew
 		packet_counter_en <= '1';
-      -- send 8 packages of size I*64 bytes and assume it took I clock cycles to receive the packet
-		-- this will use 2304 bytes in total
+      -- send 8 packages of size I*64+I bytes and assume it took I clock cycles to receive the packet
+		-- this will use 2352 bytes in total if all packages are padded so the next one in line will be word aligned
 		for I in 1 to 8 loop
 			if receiving_to_ram_en='0' then
 				wait until receiving_to_ram_en='1';
@@ -119,7 +119,7 @@ BEGIN
 			
 			-- wait for packet to be received
 			wait for clk_period*I;
-			payload_count <= I*64;
+			payload_count <= I*64+I;
 			receiving_to_ram_done <= '1';
 			wait until receiving_to_ram_en='0';
 			wait for clk_period;
@@ -128,7 +128,7 @@ BEGIN
 			wait for 2ns;		
 		end loop;
 		
-		-- now send as many packets of 1500 bytes as it takes to fill the buffer, each taking 5 clock cycles
+		-- now send as many packets of 1500 bytes as it takes so the buffer can't fit another, each taking 5 clock cycles
 		while packet_counter_done='0' loop
 			if receiving_to_ram_en='0' then
 				wait until receiving_to_ram_en='1';

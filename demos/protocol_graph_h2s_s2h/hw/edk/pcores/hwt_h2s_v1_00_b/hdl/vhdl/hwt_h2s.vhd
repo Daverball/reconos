@@ -98,9 +98,10 @@ architecture implementation of hwt_h2s is
 	type COUNTER_STATE_T is (STATE_WAIT, STATE_INCREMENT, STATE_DONE);
 	signal counter_state : COUNTER_STATE_T;
 	
-	signal packet_count      : integer range 0 to (C_LOCAL_RAM_SIZE_IN_BYTES/C_MIN_PACKET_LEN + 1);
-	signal local_base_addr   : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
-	signal packet_counter_en : std_logic;
+	signal packet_count        : integer range 0 to (C_LOCAL_RAM_SIZE_IN_BYTES/C_MIN_PACKET_LEN + 1);
+	signal local_base_addr     : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
+	signal packet_counter_en   : std_logic;
+	signal packet_counter_done : std_logic;
 
 	type RECEIVING_STATE_TYPE_T is (STATE_IDLE, STATE_DST_IDP, STATE_DST_WRITE, STATE_RCV_1, STATE_RCV_2, 
 		STATE_RCV_3, STATE_RCV_4, STATE_EOF, STATE_WRITE_LEN, STATE_WRITE_LEN1, STATE_DONE
@@ -131,8 +132,8 @@ architecture implementation of hwt_h2s is
 	signal rx_ll_src_rdy	: std_logic;
 	signal rx_ll_dst_rdy	: std_logic;
 
-	signal payload_count : integer range 0 to 1500;
-	signal payload_count_next : integer range 0 to 1500;
+	signal payload_count : integer range 0 to C_MAX_PACKET_LEN;
+	signal payload_count_next : integer range 0 to C_MAX_PACKET_LEN;
 	signal payload : std_logic_vector(31 downto 0);
 
 	signal destination	: std_logic_vector(5 downto 0);
@@ -450,8 +451,10 @@ begin
 			packet_count <= 0;
 			counter_state <= STATE_WAIT;
 			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			packet_counter_done <= '0';
 		elsif rising_edge(clk) then
 			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			packet_counter_done <= '0';
 			case counter_state is
 				-- wait for receiving_to_ram to do its job
 				when STATE_WAIT =>
@@ -472,6 +475,7 @@ begin
 						counter_state <= STATE_WAIT;
 					end if;
 				when STATE_DONE =>
+					packet_counter_done <= '1';
 				when others =>
 					counter_state <= STATE_WAIT;
 			end case;
@@ -519,7 +523,7 @@ begin
 					reconos_step <= "010";
 					reconos_fsm_ready  <= '1';	
 					receiving_to_ram_en <= '1';
-					if receiving_to_ram_done = '1' then
+					if receiving_to_ram_done = '1' then --@TODO: switch this with packet_counter_done
 						state <= STATE_WRITE;
 						reconos_fsm_ready   <= '0';
 						receiving_to_ram_en <= '0';

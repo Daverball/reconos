@@ -460,7 +460,6 @@ begin
 				when STATE_WAIT =>
 					-- receiving_to_ram_en <= '1'; -- @TODO: hook this up
 					if receiving_to_ram_done = '1' then
-						-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
 						counter_state <= STATE_INCREMENT;
 					end if;
 				-- increment packet count and base address

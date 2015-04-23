@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wave_config>
+   <wave_state>
+   </wave_state>
+   <db_ref_list>
+      <db_ref path="/data/git/reconos/demos/protocol_graph_h2s_s2h/hw/edk/pcores/hwt_h2s_v1_00_b/hdl/vhdl/h2s_debug/hwt_h2s_tb_isim_beh.wdb" id="1" type="auto">
+         <top_modules>
+            <top_module name="anapkg" />
+            <top_module name="hwt_h2s_tb" />
+            <top_module name="numeric_std" />
+            <top_module name="proc_common_pkg" />
+            <top_module name="reconos_pkg" />
+            <top_module name="std_logic_1164" />
+            <top_module name="std_logic_arith" />
+            <top_module name="std_logic_unsigned" />
+            <top_module name="textio" />
+            <top_module name="vcomponents" />
+            <top_module name="vital_primitives" />
+            <top_module name="vital_timing" />
+            <top_module name="vpkg" />
+         </top_modules>
+      </db_ref>
+   </db_ref_list>
+   <WVObjectSize size="32" />
+   <wvobject fp_name="/hwt_h2s_tb/rst" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rst</obj_property>
+      <obj_property name="ObjectShortName">rst</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/clk" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">clk</obj_property>
+      <obj_property name="ObjectShortName">clk</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider82" type="divider">
+      <obj_property name="label">ReconOS FSM</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/state" type="other" db_ref_id="1">
+      <obj_property name="ElementShortName">state</obj_property>
+      <obj_property name="ObjectShortName">state</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/base_addr" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">base_addr[31:0]</obj_property>
+      <obj_property name="ObjectShortName">base_addr[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/receiving_to_ram_en" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">receiving_to_ram_en</obj_property>
+      <obj_property name="ObjectShortName">receiving_to_ram_en</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/receiving_to_ram_done" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">receiving_to_ram_done</obj_property>
+      <obj_property name="ObjectShortName">receiving_to_ram_done</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider83" type="divider">
+      <obj_property name="label">Receive 2 RAM</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/receiving_state" type="other" db_ref_id="1">
+      <obj_property name="ElementShortName">receiving_state</obj_property>
+      <obj_property name="ObjectShortName">receiving_state</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/payload_count" type="other" db_ref_id="1">
+      <obj_property name="ElementShortName">payload_count</obj_property>
+      <obj_property name="ObjectShortName">payload_count</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider87" type="divider">
+      <obj_property name="label">RX</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/rx_ll_sof" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rx_ll_sof</obj_property>
+      <obj_property name="ObjectShortName">rx_ll_sof</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/rx_ll_eof" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rx_ll_eof</obj_property>
+      <obj_property name="ObjectShortName">rx_ll_eof</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/rx_ll_src_rdy" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rx_ll_src_rdy</obj_property>
+      <obj_property name="ObjectShortName">rx_ll_src_rdy</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/rx_ll_dst_rdy" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">rx_ll_dst_rdy</obj_property>
+      <obj_property name="ObjectShortName">rx_ll_dst_rdy</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/rx_ll_data" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">rx_ll_data[7:0]</obj_property>
+      <obj_property name="ObjectShortName">rx_ll_data[7:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider93" type="divider">
+      <obj_property name="label">Local RAM</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/o_ramwe_sender" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">o_ramwe_sender</obj_property>
+      <obj_property name="ObjectShortName">o_ramwe_sender</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/o_ramaddr_sender" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">o_ramaddr_sender[0:10]</obj_property>
+      <obj_property name="ObjectShortName">o_ramaddr_sender[0:10]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/o_ramdata_sender" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">o_ramdata_sender[0:31]</obj_property>
+      <obj_property name="ObjectShortName">o_ramdata_sender[0:31]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider26" type="divider">
+      <obj_property name="label">Switch</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/switch_data_rdy" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">switch_data_rdy</obj_property>
+      <obj_property name="ObjectShortName">switch_data_rdy</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/switch_data" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">switch_data[8:0]</obj_property>
+      <obj_property name="ObjectShortName">switch_data[8:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/thread_read_rdy" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">thread_read_rdy</obj_property>
+      <obj_property name="ObjectShortName">thread_read_rdy</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider33" type="divider">
+      <obj_property name="label">NoC header</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/srcidp" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">srcidp[31:0]</obj_property>
+      <obj_property name="ObjectShortName">srcidp[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/dstidp" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">dstidp[31:0]</obj_property>
+      <obj_property name="ObjectShortName">dstidp[31:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider34" type="divider">
+      <obj_property name="label">Testbench</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/state_g" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">state_g[15:0]</obj_property>
+      <obj_property name="ObjectShortName">state_g[15:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/state_g_next" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">state_g_next[15:0]</obj_property>
+      <obj_property name="ObjectShortName">state_g_next[15:0]</obj_property>
+      <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/counter" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">counter[15:0]</obj_property>
+      <obj_property name="ObjectShortName">counter[15:0]</obj_property>
+      <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/counter_next" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">counter_next[15:0]</obj_property>
+      <obj_property name="ObjectShortName">counter_next[15:0]</obj_property>
+      <obj_property name="Radix">UNSIGNEDDECRADIX</obj_property>
+   </wvobject>
+</wave_config>

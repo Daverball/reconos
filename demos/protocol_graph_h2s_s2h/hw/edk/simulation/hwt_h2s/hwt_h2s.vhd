@@ -450,15 +450,15 @@ begin
 			local_base_addr <= (others => '0');
 			packet_count <= 0;
 			counter_state <= STATE_WAIT;
-			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			receiving_to_ram_en <= '0';
 			packet_counter_done <= '0';
 		elsif rising_edge(clk) then
-			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			receiving_to_ram_en <= '0';
 			packet_counter_done <= '0';
 			case counter_state is
 				-- wait for receiving_to_ram to do its job
 				when STATE_WAIT =>
-					-- receiving_to_ram_en <= '1'; -- @TODO: hook this up
+					receiving_to_ram_en <= '1';
 					if receiving_to_ram_done = '1' then
 						counter_state <= STATE_INCREMENT;
 					end if;
@@ -497,13 +497,11 @@ begin
 			base_addr_answer <= (others => '0');
 			reconos_fsm_ready <= '0';
 			reconos_step <= "000";
-			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
 			packet_counter_en <= '0';
 		elsif rising_edge(clk) then
-			total_packet_len  <= std_logic_vector(to_unsigned(payload_count, 32));
+			total_packet_len  <= std_logic_vector(to_unsigned(to_integer(unsigned(local_base_addr)), 22));
 			data_ready <= '0';
 			reconos_fsm_ready  <= '0';
-			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
 			packet_counter_en <= '1';
 			case state is
 				-- get main memory address of packet buffer
@@ -515,7 +513,6 @@ begin
 					if done then
 						state <= STATE_WAIT;
 						reconos_fsm_ready  <= '1';
-						receiving_to_ram_en <= '1'; -- @TODO: get rid of this
 						packet_counter_en <= '1';
 						base_addr <= base_addr(31 downto 2) & "00";
 					end if;				
@@ -523,18 +520,16 @@ begin
 				when STATE_WAIT =>
 					data_ready <= '1';
 					reconos_step <= "010";
-					reconos_fsm_ready  <= '1';	
-					receiving_to_ram_en <= '1'; -- @TODO: get rid of this
-					if receiving_to_ram_done = '1' then --@TODO: switch this with packet_counter_done
+					reconos_fsm_ready  <= '1';
+					if packet_counter_done = '1' then
 						state <= STATE_WRITE;
 						reconos_fsm_ready   <= '0';
-						receiving_to_ram_en <= '0'; --@TODO: get rid of this
 					end if;
 				-- copy packet from local ram to main memory
 				when STATE_WRITE =>
 					reconos_step <= "011";
 					reconos_fsm_ready  <= '0';
-					memif_write(i_ram, o_ram, i_memif, o_memif, X"00000000", base_addr, total_packet_len(23 downto 0) + 4, done); --the length is silently truncated!
+					memif_write(i_ram, o_ram, i_memif, o_memif, X"00000000", base_addr, total_packet_len & "00", done); --extend to 24 bits and upshift
 					if done then 
 						state <= STATE_PUT;
 					end if;					

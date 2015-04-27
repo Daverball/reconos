@@ -498,22 +498,25 @@ begin
 			reconos_fsm_ready <= '0';
 			reconos_step <= "000";
 			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
-			packet_counter_en <= '0'; -- @TODO: make sure to swap to_ram_en for couter_en
+			packet_counter_en <= '0';
 		elsif rising_edge(clk) then
 			total_packet_len  <= std_logic_vector(to_unsigned(payload_count, 32));
 			data_ready <= '0';
 			reconos_fsm_ready  <= '0';
-			receiving_to_ram_en <= '0';
+			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
+			packet_counter_en <= '1';
 			case state is
 				-- get main memory address of packet buffer
 				when STATE_INIT =>
 					reconos_step <= "001";
 					base_addr_answer <= (others => '0');
 					osif_mbox_get(i_osif, o_osif, MBOX_RECV, base_addr, done);
+					packet_counter_en <= '0';
 					if done then
 						state <= STATE_WAIT;
 						reconos_fsm_ready  <= '1';
-						receiving_to_ram_en <= '1';
+						receiving_to_ram_en <= '1'; -- @TODO: get rid of this
+						packet_counter_en <= '1';
 						base_addr <= base_addr(31 downto 2) & "00";
 					end if;				
 				-- wait for next packet
@@ -521,11 +524,11 @@ begin
 					data_ready <= '1';
 					reconos_step <= "010";
 					reconos_fsm_ready  <= '1';	
-					receiving_to_ram_en <= '1';
+					receiving_to_ram_en <= '1'; -- @TODO: get rid of this
 					if receiving_to_ram_done = '1' then --@TODO: switch this with packet_counter_done
 						state <= STATE_WRITE;
 						reconos_fsm_ready   <= '0';
-						receiving_to_ram_en <= '0';
+						receiving_to_ram_en <= '0'; --@TODO: get rid of this
 					end if;
 				-- copy packet from local ram to main memory
 				when STATE_WRITE =>
@@ -543,11 +546,13 @@ begin
 				-- get nextmain memory address (packet buffer)
 				when STATE_GET_LEN  => 
 					reconos_step <= "101";
+					packet_counter_en <= '0';
 					osif_mbox_get(i_osif, o_osif, MBOX_RECV, base_addr, done);
 					if done then state  <= STATE_WAIT; end if;
 				-- thread exit
 				when STATE_THREAD_EXIT =>
 					reconos_step <= "111";
+					packet_counter_en <= '0';
 					osif_thread_exit(i_osif,o_osif);					
 				when others =>
 					state <= STATE_INIT;			

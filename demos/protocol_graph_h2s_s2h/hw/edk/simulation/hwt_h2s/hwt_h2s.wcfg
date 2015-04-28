@@ -21,7 +21,7 @@
          </top_modules>
       </db_ref>
    </db_ref_list>
-   <WVObjectSize size="42" />
+   <WVObjectSize size="43" />
    <wvobject fp_name="/hwt_h2s_tb/rst" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">rst</obj_property>
       <obj_property name="ObjectShortName">rst</obj_property>
@@ -44,6 +44,10 @@
       <obj_property name="ElementShortName">base_addr[31:0]</obj_property>
       <obj_property name="ObjectShortName">base_addr[31:0]</obj_property>
       <obj_property name="Radix">HEXRADIX</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/total_packet_len" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">total_packet_len[31:0]</obj_property>
+      <obj_property name="ObjectShortName">total_packet_len[31:0]</obj_property>
    </wvobject>
    <wvobject fp_name="/hwt_h2s_tb/uut/receiving_to_ram_en" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">receiving_to_ram_en</obj_property>

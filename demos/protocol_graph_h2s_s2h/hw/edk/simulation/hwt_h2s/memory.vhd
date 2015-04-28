@@ -15,7 +15,7 @@ entity memory is
 end memory;
 
 architecture Behavioral of memory is
-	constant C_MEM_SIZE : natural := 4*1024;-- 0x00000000 ... 0x00001000
+	constant C_MEM_SIZE : natural := 2048;-- 0x00000000 ... 0x00000800
 	type MEM_T is array (0 to C_MEM_SIZE-1) of std_logic_vector(31 downto 0);
 	signal mem : MEM_T;
 begin

@@ -77,7 +77,7 @@ architecture implementation of hwt_h2s is
 	
 	-- IMPORTANT: define timeout and cycles per milisecond here
 	constant C_CYCLES_PER_MSECOND : integer := 100*1000;
-	constant C_TIMEOUT           : integer := C_CYCLES_PER_MSECOND/20; --induce a timeout
+	constant C_TIMEOUT           : integer := 10*C_CYCLES_PER_MSECOND; --induce a timeout
 
 	type LOCAL_MEMORY_T is array (0 to C_LOCAL_RAM_SIZE-1) of std_logic_vector(31 downto 0);
 	signal o_RAMAddr_sender : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
@@ -148,7 +148,7 @@ architecture implementation of hwt_h2s is
 	signal data_ready : std_logic;
 	signal packets_sent : std_logic;
 	
-	signal total_packet_len : std_logic_vector(31 downto 0);
+	signal total_packet_len : std_logic_vector(21 downto 0);
 	signal debug_packet_len : std_logic_vector(31 downto 0);
 	signal debug_packet_len2 : std_logic_vector(31 downto 0);
 	
@@ -491,7 +491,7 @@ begin
 				when STATE_INCREMENT =>
 					packet_count <= packet_count + 1;
 					--always round up to the next word if it does not evenly divide
-					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count,C_LOCAL_RAM_ADDRESS_WIDTH)+3)/4);
+					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count, C_LOCAL_RAM_ADDRESS_WIDTH-1)+3)/4);
 					local_base_addr <= std_logic_vector(base_addr_tmp);
 					if base_addr_tmp + C_MAX_PACKET_LEN/4 < base_addr_tmp or timeout = '1' then --base_addr wrapped around so our buffer can't fit another packet of max size
 						counter_state <= STATE_DONE;
@@ -562,7 +562,7 @@ begin
 				-- inform software, that a packet has been forwarded
 				when STATE_PUT =>
 					reconos_step <= "100";
-					osif_mbox_put(i_osif, o_osif, MBOX_SEND, total_packet_len, ignore, done);
+					osif_mbox_put(i_osif, o_osif, MBOX_SEND, std_logic_vector(to_unsigned(packet_count,32)), ignore, done);
 					if done then state <= STATE_GET_LEN; end if;				
 				-- get nextmain memory address (packet buffer)
 				when STATE_GET_LEN  => 

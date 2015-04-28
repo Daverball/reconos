@@ -21,7 +21,7 @@
          </top_modules>
       </db_ref>
    </db_ref_list>
-   <WVObjectSize size="38" />
+   <WVObjectSize size="42" />
    <wvobject fp_name="/hwt_h2s_tb/rst" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">rst</obj_property>
       <obj_property name="ObjectShortName">rst</obj_property>
@@ -52,6 +52,24 @@
    <wvobject fp_name="/hwt_h2s_tb/uut/receiving_to_ram_done" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">receiving_to_ram_done</obj_property>
       <obj_property name="ObjectShortName">receiving_to_ram_done</obj_property>
+   </wvobject>
+   <wvobject fp_name="divider42" type="divider">
+      <obj_property name="label">Timeout Counter</obj_property>
+      <obj_property name="DisplayName">label</obj_property>
+      <obj_property name="BkColor">128 128 255</obj_property>
+      <obj_property name="TextColor">230 230 230</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/timeout_counter_en" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">timeout_counter_en</obj_property>
+      <obj_property name="ObjectShortName">timeout_counter_en</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/timer" type="other" db_ref_id="1">
+      <obj_property name="ElementShortName">timer</obj_property>
+      <obj_property name="ObjectShortName">timer</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/timeout" type="logic" db_ref_id="1">
+      <obj_property name="ElementShortName">timeout</obj_property>
+      <obj_property name="ObjectShortName">timeout</obj_property>
    </wvobject>
    <wvobject fp_name="divider39" type="divider">
       <obj_property name="label">Packet Counter</obj_property>

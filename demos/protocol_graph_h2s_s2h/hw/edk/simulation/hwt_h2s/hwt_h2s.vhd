@@ -74,6 +74,10 @@ architecture implementation of hwt_h2s is
 	-- IMPORTANT: define maximum and minimum packet lengths here
 	constant C_MAX_PACKET_LEN : integer := 1500;
 	constant C_MIN_PACKET_LEN : integer := 64;
+	
+	-- IMPORTANT: define timeout and cycles per milisecond here
+	constant C_CYCLES_PER_MSECOND : integer := 100*1000;
+	constant C_TIMEOUT           : integer := C_CYCLES_PER_MSECOND/20; --induce a timeout
 
 	type LOCAL_MEMORY_T is array (0 to C_LOCAL_RAM_SIZE-1) of std_logic_vector(31 downto 0);
 	signal o_RAMAddr_sender : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
@@ -94,6 +98,10 @@ architecture implementation of hwt_h2s is
 	type testing_state_t is (T_STATE_INIT, T_STATE_RCV);
 	signal testing_state 	    : testing_state_t;
 	signal testing_state_next   : testing_state_t;
+	
+	signal timeout_counter_en : std_logic;
+	signal timeout            : std_logic;
+	signal timer              : integer range 0 to C_TIMEOUT;
 	
 	type COUNTER_STATE_T is (STATE_WAIT, STATE_INCREMENT, STATE_DONE);
 	signal counter_state : COUNTER_STATE_T;
@@ -441,6 +449,21 @@ begin
 	    end if;
 	end process;
 	
+	timeout_counter: process (clk,rst,timeout_counter_en) is
+	begin
+		if rst = '1' or timeout_counter_en = '0' then
+			timer <= 0;
+			timeout <= '0';
+		elsif rising_edge(clk) then
+			if timer < C_TIMEOUT then
+				timeout <= '0';
+				timer <= timer + 1;
+			else
+				timeout <= '1';
+			end if;
+		end if;
+	end process;
+	
 	-- packet_counter_fsm keeps track of where in local RAM the next packet goes
 	-- and if we have space for more before flushing the buffer to shared memory
 	packet_counter_fsm: process (clk,rst,packet_counter_en) is
@@ -451,10 +474,12 @@ begin
 			packet_count <= 0;
 			counter_state <= STATE_WAIT;
 			receiving_to_ram_en <= '0';
+			timeout_counter_en <= '0';
 			packet_counter_done <= '0';
 		elsif rising_edge(clk) then
 			receiving_to_ram_en <= '0';
 			packet_counter_done <= '0';
+			timeout_counter_en <= '1';
 			case counter_state is
 				-- wait for receiving_to_ram to do its job
 				when STATE_WAIT =>
@@ -468,12 +493,13 @@ begin
 					--always round up to the next word if it does not evenly divide
 					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count,C_LOCAL_RAM_ADDRESS_WIDTH)+3)/4);
 					local_base_addr <= std_logic_vector(base_addr_tmp);
-					if base_addr_tmp + C_MAX_PACKET_LEN/4 < base_addr_tmp then --base_addr wrapped around so our buffer can't fit another packet of max size
+					if base_addr_tmp + C_MAX_PACKET_LEN/4 < base_addr_tmp or timeout = '1' then --base_addr wrapped around so our buffer can't fit another packet of max size
 						counter_state <= STATE_DONE;
 					else
 						counter_state <= STATE_WAIT;
 					end if;
 				when STATE_DONE =>
+					timeout_counter_en <= '0';
 					packet_counter_done <= '1';
 				when others =>
 					counter_state <= STATE_WAIT;

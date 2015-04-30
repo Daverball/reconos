@@ -118,12 +118,11 @@ int main(int argc, char *argv[])
 
 			// print packet
 			for (i=0;i<(msg_len/4);i++){
-				printf("0x%08x  ",ptr[i]);
+				printf("0x%08x  ",*(ptr++));
 				if ((i+1)%4==0){ 
 					printf("\n");
 				}
 			}
-			ptr += msg_len/4; //advance ptr to next packet
 			cnt++;
 			k++;
 		} 

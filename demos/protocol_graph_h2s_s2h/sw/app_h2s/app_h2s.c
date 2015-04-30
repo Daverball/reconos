@@ -52,10 +52,10 @@ void config_eth(unsigned int hash_1, unsigned int hash_2, unsigned int idp, int 
 
 void setup_noc(void)
 {
-	shared_mem_h2s = malloc(4096); 
-	memset(shared_mem_h2s, 0, 4096);
-	shared_mem_s2h = malloc(4096); 
-	memset(shared_mem_s2h, 0, 4096);
+	shared_mem_h2s = malloc(2048*4); 
+	memset(shared_mem_h2s, 0, 2048*4);
+	shared_mem_s2h = malloc(2048*4); 
+	memset(shared_mem_s2h, 0, 2048*4);
 	mbox_put(&mb_in[HWT_H2S], (unsigned int) shared_mem_h2s);
 	mbox_put(&mb_in[HWT_S2H], (unsigned int) shared_mem_s2h);
 	config_eth(0xabababab, 0xabababab, 3, TO_H2S); // SW
@@ -68,9 +68,10 @@ void setup_noc(void)
 // MAIN ////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-	int i, cnt=1, msg_len;
-	int max_cnt = 10;
+	int i, k, cnt=1, buf_cnt=1, packet_count;
+	int max_cnt = 2; //print up to two filled buffers
 	unsigned int * ptr = (unsigned int *) shared_mem_h2s;
+	unsigned short msg_len;
 
 	printf( "-------------------------------------------------------\n"
 		    "APP DEMO\n"
@@ -105,28 +106,35 @@ int main(int argc, char *argv[])
 	// receive packets
 	while(1) {
 		// receive message from h2s
-		msg_len = mbox_get(&mb_out[HWT_H2S]);
+		packet_count = mbox_get(&mb_out[HWT_H2S]);
 
 		// flush cache
 		reconos_cache_flush();
+		k=0;
+		while(k < packet_count){
+			printf("\n\n[app] Packet no. %04d\n",cnt);
+			
+			msg_len = *(((unsigned short *) ptr) + 1); //get msg_len out of packet header
 
-		printf("\n\n[app] Packet no. %04d\n",cnt);
-
-		// print packet
-		for (i=0;i<(msg_len/4);i++){
-			printf("0x%08x  ",ptr[i]);
-			if ((i+1)%4==0){ 
-				printf("\n");
+			// print packet
+			for (i=0;i<(msg_len/4);i++){
+				printf("0x%08x  ",ptr[i]);
+				if ((i+1)%4==0){ 
+					printf("\n");
+				}
 			}
-		}
+			ptr += msg_len/4; //advance ptr to next packet
+			cnt++;
+			k++;
+		} 
 
 		// send ack to h2s
 		mbox_put(&mb_in[HWT_H2S],(unsigned int) shared_mem_h2s);
 
 		// stop after max_cnt packets
-		if(cnt == max_cnt)
+		if(buf_cnt == max_cnt)
 			break;
-		cnt++;
+		buf_cnt++;
 	}
 	printf("\n");
 	return 0;

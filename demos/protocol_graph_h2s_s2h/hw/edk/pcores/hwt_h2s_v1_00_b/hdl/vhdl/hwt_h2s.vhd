@@ -74,6 +74,10 @@ architecture implementation of hwt_h2s is
 	-- IMPORTANT: define maximum and minimum packet lengths here
 	constant C_MAX_PACKET_LEN : integer := 1500;
 	constant C_MIN_PACKET_LEN : integer := 64;
+	
+	-- IMPORTANT: define timeout and cycles per milisecond here
+	constant C_CYCLES_PER_MSECOND : integer := 100*1000;
+	constant C_TIMEOUT           : integer := 10*C_CYCLES_PER_MSECOND;
 
 	type LOCAL_MEMORY_T is array (0 to C_LOCAL_RAM_SIZE-1) of std_logic_vector(31 downto 0);
 	signal o_RAMAddr_sender : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
@@ -94,6 +98,10 @@ architecture implementation of hwt_h2s is
 	type testing_state_t is (T_STATE_INIT, T_STATE_RCV);
 	signal testing_state 	    : testing_state_t;
 	signal testing_state_next   : testing_state_t;
+	
+	signal timeout_counter_en : std_logic;
+	signal timeout            : std_logic;
+	signal timer              : integer range 0 to C_TIMEOUT;
 	
 	type COUNTER_STATE_T is (STATE_WAIT, STATE_INCREMENT, STATE_DONE);
 	signal counter_state : COUNTER_STATE_T;
@@ -140,7 +148,7 @@ architecture implementation of hwt_h2s is
 	signal data_ready : std_logic;
 	signal packets_sent : std_logic;
 	
-	signal total_packet_len : std_logic_vector(31 downto 0);
+	signal total_packet_len : std_logic_vector(21 downto 0);
 	signal debug_packet_len : std_logic_vector(31 downto 0);
 	signal debug_packet_len2 : std_logic_vector(31 downto 0);
 	
@@ -441,6 +449,21 @@ begin
 	    end if;
 	end process;
 	
+	timeout_counter: process (clk,rst,timeout_counter_en) is
+	begin
+		if rst = '1' or timeout_counter_en = '0' then
+			timer <= 0;
+			timeout <= '0';
+		elsif rising_edge(clk) then
+			if timer < C_TIMEOUT then
+				timeout <= '0';
+				timer <= timer + 1;
+			else
+				timeout <= '1';
+			end if;
+		end if;
+	end process;
+	
 	-- packet_counter_fsm keeps track of where in local RAM the next packet goes
 	-- and if we have space for more before flushing the buffer to shared memory
 	packet_counter_fsm: process (clk,rst,packet_counter_en) is
@@ -450,15 +473,17 @@ begin
 			local_base_addr <= (others => '0');
 			packet_count <= 0;
 			counter_state <= STATE_WAIT;
-			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			receiving_to_ram_en <= '0';
+			timeout_counter_en <= '0';
 			packet_counter_done <= '0';
 		elsif rising_edge(clk) then
-			-- receiving_to_ram_en <= '0'; -- @TODO: hook this up
+			receiving_to_ram_en <= '0';
 			packet_counter_done <= '0';
+			timeout_counter_en <= '1';
 			case counter_state is
 				-- wait for receiving_to_ram to do its job
 				when STATE_WAIT =>
-					-- receiving_to_ram_en <= '1'; -- @TODO: hook this up
+					receiving_to_ram_en <= '1';
 					if receiving_to_ram_done = '1' then
 						counter_state <= STATE_INCREMENT;
 					end if;
@@ -466,14 +491,15 @@ begin
 				when STATE_INCREMENT =>
 					packet_count <= packet_count + 1;
 					--always round up to the next word if it does not evenly divide
-					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count,C_LOCAL_RAM_ADDRESS_WIDTH)+3)/4);
+					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count, C_LOCAL_RAM_ADDRESS_WIDTH-1)+3)/4);
 					local_base_addr <= std_logic_vector(base_addr_tmp);
-					if base_addr_tmp + C_MAX_PACKET_LEN/4 < base_addr_tmp then --base_addr wrapped around so our buffer can't fit another packet of max size
+					if base_addr_tmp + C_MAX_PACKET_LEN/4 < base_addr_tmp or timeout = '1' then --base_addr wrapped around so our buffer can't fit another packet of max size
 						counter_state <= STATE_DONE;
 					else
 						counter_state <= STATE_WAIT;
 					end if;
 				when STATE_DONE =>
+					timeout_counter_en <= '0';
 					packet_counter_done <= '1';
 				when others =>
 					counter_state <= STATE_WAIT;
@@ -497,13 +523,11 @@ begin
 			base_addr_answer <= (others => '0');
 			reconos_fsm_ready <= '0';
 			reconos_step <= "000";
-			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
 			packet_counter_en <= '0';
 		elsif rising_edge(clk) then
-			total_packet_len  <= std_logic_vector(to_unsigned(payload_count, 32));
+			total_packet_len  <= std_logic_vector(to_unsigned(to_integer(unsigned(local_base_addr)), 22));
 			data_ready <= '0';
 			reconos_fsm_ready  <= '0';
-			receiving_to_ram_en <= '0'; -- @TODO: get rid of this
 			packet_counter_en <= '1';
 			case state is
 				-- get main memory address of packet buffer
@@ -515,7 +539,6 @@ begin
 					if done then
 						state <= STATE_WAIT;
 						reconos_fsm_ready  <= '1';
-						receiving_to_ram_en <= '1'; -- @TODO: get rid of this
 						packet_counter_en <= '1';
 						base_addr <= base_addr(31 downto 2) & "00";
 					end if;				
@@ -523,25 +546,23 @@ begin
 				when STATE_WAIT =>
 					data_ready <= '1';
 					reconos_step <= "010";
-					reconos_fsm_ready  <= '1';	
-					receiving_to_ram_en <= '1'; -- @TODO: get rid of this
-					if receiving_to_ram_done = '1' then --@TODO: switch this with packet_counter_done
+					reconos_fsm_ready  <= '1';
+					if packet_counter_done = '1' then
 						state <= STATE_WRITE;
 						reconos_fsm_ready   <= '0';
-						receiving_to_ram_en <= '0'; --@TODO: get rid of this
 					end if;
 				-- copy packet from local ram to main memory
 				when STATE_WRITE =>
 					reconos_step <= "011";
 					reconos_fsm_ready  <= '0';
-					memif_write(i_ram, o_ram, i_memif, o_memif, X"00000000", base_addr, total_packet_len(23 downto 0) + 4, done); --the length is silently truncated!
+					memif_write(i_ram, o_ram, i_memif, o_memif, X"00000000", base_addr, total_packet_len & "00", done); --extend to 24 bits and upshift
 					if done then 
 						state <= STATE_PUT;
 					end if;					
 				-- inform software, that a packet has been forwarded
 				when STATE_PUT =>
 					reconos_step <= "100";
-					osif_mbox_put(i_osif, o_osif, MBOX_SEND, total_packet_len, ignore, done);
+					osif_mbox_put(i_osif, o_osif, MBOX_SEND, std_logic_vector(to_unsigned(packet_count,32)), ignore, done);
 					if done then state <= STATE_GET_LEN; end if;				
 				-- get nextmain memory address (packet buffer)
 				when STATE_GET_LEN  => 

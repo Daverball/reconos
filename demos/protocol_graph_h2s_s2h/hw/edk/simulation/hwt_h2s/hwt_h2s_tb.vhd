@@ -114,6 +114,7 @@ ARCHITECTURE behavior OF hwt_h2s_tb IS
 	signal state_g_next : std_logic_vector (15 downto 0);
 	signal counter : std_logic_vector (15 downto 0);
 	signal counter_next : std_logic_vector (15 downto 0);
+	signal packet_count : integer range 0 to 128;
 	signal switch : std_logic := '0';
 	
 BEGIN
@@ -121,8 +122,12 @@ BEGIN
 	--packet_gen_proc : process(state_g,counter,counter_next,thread_read_rdy)
 	packet_gen_proc : process(state_g,counter,counter_next,thread_read_rdy)
 	begin
+		if rst = '1' then
+			packet_count <= 0;
+		end if;
 		state_g_next <= state_g + 1;
 		counter_next <= (others=>'0');
+		packet_count <= packet_count;
 		case state_g is
 			-- send NoC header
 			when X"0000" => 
@@ -178,7 +183,11 @@ BEGIN
 				end if;
 			when X"000D" => -- switch between "AB" and "CD" packets
 				switch <= not switch;
+				packet_count <= packet_count + 1;
 			when X"000E" => 
+				if packet_count > 4 then --stop sending packets after the fourth one
+					state_g_next <= X"000E";
+				end if;
 				switch_data <= "0"&X"00";
 				switch_data_rdy <= '0';
 			when X"000F" => -- send next packet

@@ -300,7 +300,10 @@ begin
 						payload_count  <= 1;
 						payload(31 downto 24)  <= rx_ll_data;
 						receiving_state  <= STATE_DST_IDP;
-						rx_ll_dst_rdy_local  <= '1'; 
+						rx_ll_dst_rdy_local  <= '1';
+					elsif timeout = '1' then --if we haven't gotten a packet yet and reached a timeout, skip to STATE_DONE
+						payload_count <= 0;
+						receiving_state <= STATE_DONE;
 					end if;
 				when STATE_DST_IDP  =>
 	   			write_step <= "0010";
@@ -489,7 +492,9 @@ begin
 					end if;
 				-- increment packet count and base address
 				when STATE_INCREMENT =>
-					packet_count <= packet_count + 1;
+					if payload_count > 0 then
+						packet_count <= packet_count + 1; --only increment if we got a packet of size > 0
+					end if;
 					--always round up to the next word if it does not evenly divide
 					base_addr_tmp := unsigned(local_base_addr) + ((to_unsigned(payload_count, C_LOCAL_RAM_ADDRESS_WIDTH-1)+3)/4);
 					local_base_addr <= std_logic_vector(base_addr_tmp);

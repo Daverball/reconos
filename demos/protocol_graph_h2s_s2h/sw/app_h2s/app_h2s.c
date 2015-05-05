@@ -27,6 +27,13 @@
 #define TO_ETH 4
 #define TO_FB1 1
 
+#define BUFFER_SIZE 4*2048
+
+// Debug
+#if DEBUG > 0
+#include "fillbuffer.h"
+#endif
+
 struct reconos_resource res[NUM_SLOTS][2];
 struct reconos_hwt hwt[NUM_SLOTS];
 struct mbox mb_in[NUM_SLOTS];
@@ -52,15 +59,18 @@ void config_eth(unsigned int hash_1, unsigned int hash_2, unsigned int idp, int 
 
 void setup_noc(void)
 {
-	shared_mem_h2s = malloc(2048*4); 
-	memset(shared_mem_h2s, 0, 2048*4);
-	shared_mem_s2h = malloc(2048*4); 
-	memset(shared_mem_s2h, 0, 2048*4);
+	shared_mem_h2s = malloc(BUFFER_SIZE); 
+	memset(shared_mem_h2s, 0, BUFFER_SIZE);
+	shared_mem_s2h = malloc(BUFFER_SIZE); 
+	memset(shared_mem_s2h, 0, BUFFER_SIZE);
 	mbox_put(&mb_in[HWT_H2S], (unsigned int) shared_mem_h2s);
 	mbox_put(&mb_in[HWT_S2H], (unsigned int) shared_mem_s2h);
 	config_eth(0xabababab, 0xabababab, 3, TO_H2S); // SW
 	config_eth(0xcdcdcdcd, 0xcdcdcdcd, 2, TO_FB1); // HW
 	//mbox_put(&mb_in[HWT_ETH], TO_H2S );
+	#if DEBUG > 0
+	fill_buffer(shared_mem_h2s, BUFFER_SIZE);
+	#endif
 }
 
 
@@ -69,7 +79,7 @@ void setup_noc(void)
 int main(int argc, char *argv[])
 {
 	int i, k, cnt=1, buf_cnt=1, packet_count;
-	int max_cnt = 2; //print up to two filled buffers
+	int max_cnt = 2; //print up to max_cnt filled buffers
 	unsigned int * ptr = (unsigned int *) shared_mem_h2s;
 	unsigned short msg_len;
 
@@ -100,7 +110,6 @@ int main(int argc, char *argv[])
 	printf("[app] Setup NoC\n");
 	setup_noc();
 
-	ptr = (unsigned int *) shared_mem_h2s;
 	printf("[app] Waiting for packets...\n");
 
 	// receive packets
@@ -111,13 +120,15 @@ int main(int argc, char *argv[])
 		// flush cache
 		reconos_cache_flush();
 		k=0;
+
+		ptr = (unsigned int *) shared_mem_h2s;
 		while(k < packet_count){
 			printf("\n\n[app] Packet no. %04d\n",cnt);
 			
 			msg_len = *(((unsigned short *) ptr) + 1); //get msg_len out of packet header
 
 			// print packet
-			for (i=0;i<(msg_len/4);i++){
+			for (i=0;i<((msg_len+3)/4);i++){
 				printf("0x%08x  ",*(ptr++));
 				if ((i+1)%4==0){ 
 					printf("\n");

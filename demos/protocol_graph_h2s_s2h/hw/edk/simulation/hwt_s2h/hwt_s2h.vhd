@@ -565,11 +565,10 @@ begin
 			send_packets_en <= '0';
 			packet_counter_done <= '0';
 			case counter_state is
-				-- set RAM read address to read packet count
+				-- we don't need to set RAM address since it will always be reset to 0
 				when STATE_INIT1 =>
-					o_RAMAddr_sender <= (others => '0');
-					counter_state <= STATE_INIT1;
-				-- wait for receiving_to_ram to do its job
+					counter_state <= STATE_INIT2;
+				-- wait for local RAM some more
 				when STATE_INIT2 =>
 					local_base_addr <= local_base_addr + 1; -- set to address 1 for first packet
 					counter_state <= STATE_GET_NUM;
@@ -625,7 +624,7 @@ begin
 					reconos_fsm <= "001";
 					osif_mbox_get(i_osif, o_osif, MBOX_RECV, base_addr, done);
 					packet_counter_en <= '0';
-					if done then
+					if done and base_addr=0 then -- hack to synchronize
 						state <= STATE_GET_LEN;
 						base_addr <= base_addr(31 downto 2) & "00";
 					end if;				
@@ -634,13 +633,13 @@ begin
 					reconos_fsm <= "010";
 					packet_counter_en <= '0';
 					osif_mbox_get(i_osif, o_osif, MBOX_RECV, len, done);
-					if done then
+					if done and len>0 then -- hack to synchronize
 						state <= STATE_READ;
 					end if;
 				-- copy data from main memory to local memory
 				when STATE_READ =>
 					reconos_fsm <= "011";
-					memif_read(i_ram,o_ram,i_memif,o_memif, base_addr, X"00000000", len(23 downto 0), done);
+					memif_read(i_ram,o_ram,i_memif,o_memif, base_addr, X"00000000", len(23 downto 0) + 4, done); --this is off by one word for some reason
 					packet_counter_en <= '0';
 					if done then
 						state <= STATE_WAIT;

@@ -108,94 +108,31 @@ ARCHITECTURE behavior OF hwt_s2h_tb IS
 
 	type MEMSTATE_T is (MEMSTATE_IDLE, MEMSTATE_READ_CMD, MEMSTATE_READ_ADDR, MEMSTATE_WRITE, MEMSTATE_COPY_TO_RAM,
 	                    MEMSTATE_READ, MEMSTATE_COPY_FROM_RAM);
+							  
+	type P_RCV_STATE_T is (STATE_IDLE, STATE_RCV);
 	
 	signal memstate : MEMSTATE_T;
-	signal state_g : std_logic_vector (15 downto 0);
-	signal state_g_next : std_logic_vector (15 downto 0);
-	signal counter : std_logic_vector (15 downto 0);
-	signal counter_next : std_logic_vector (15 downto 0);
-	signal packet_count : integer range 0 to 128;
-	signal switch : std_logic := '0';
+	signal state_g : P_RCV_STATE_T;
+	signal state_g_next : P_RCV_STATE_T;
 	
 BEGIN
 
-	--packet_gen_proc : process(state_g,counter,counter_next,thread_read_rdy)
-	packet_gen_proc : process(state_g,counter,counter_next,thread_read_rdy)
+	packet_rcv_proc : process(state_g,thread_data_rdy)
 	begin
-		if rst = '1' then
-			packet_count <= 0;
-		end if;
-		state_g_next <= state_g + 1;
-		counter_next <= (others=>'0');
-		packet_count <= packet_count;
+		state_g_next <= state_g;
+		switch_read_rdy <= '0';
 		case state_g is
-			-- send NoC header
-			when X"0000" => 
-				switch_data_rdy <= '0';
-				switch_data <= "0"&X"00";
-			when X"0001" => -- switch_addr(4b), block_addr (2b), prio (2b) -> will be ignored by s2h
-				switch_data_rdy <= '1';
-				switch_data <= "0"&X"00";
-			when X"0002" => -- direction (1), latency-critical (1b), reserved (6b) -> will be ignored by s2h
-				switch_data <= "0"&X"00";
-			when X"0003" => -- src idp (4 bytes)
-				switch_data <= "0"&X"00";
-			when X"0004" =>
-				switch_data <= "0"&X"00";
-			when X"0005" =>
-				switch_data <= "0"&X"00";
-			when X"0006" =>
-				switch_data <= "0"&X"06";
-			when X"0007" => -- dst idp (4 bytes)
-				switch_data <= "0"&X"00";
-			when X"0008" =>
-				switch_data <= "0"&X"00";
-			when X"0009" =>
-				switch_data <= "0"&X"00";
-			when X"000A" =>
-				switch_data <= "0"&X"07";
-			when X"000B" => -- payload length
-				if (switch='0') then
-					switch_data <= "0"&X"AB";
-					if (counter_next < (PAYLOAD_LENGTH-1)) then
-						state_g_next <= state_g;
-					else
-						state_g_next <= state_g + 1;
-					end if;
-				else
-					switch_data <= "0"&X"CD";
-					if (counter_next < (PAYLOAD_LENGTH2-1)) then
-						state_g_next <= state_g;
-					else
-						state_g_next <= state_g + 1;
-					end if;
+			when STATE_IDLE =>
+				if thread_data_rdy = '1' then --received SOF
+					state_g_next <= STATE_RCV;
 				end if;
-				if (thread_read_rdy='1') then
-					counter_next <= counter + 1;
-				else
-					counter_next <= counter;
+			when STATE_RCV =>
+				switch_read_rdy <= '1';
+				if thread_data_rdy = '0' then --received EOF
+					state_g_next <= STATE_IDLE;
 				end if;
-			when X"000C" => -- final word
-				if (switch='0') then
-					switch_data <= "1"&X"AF";
-				else
-					switch_data <= "1"&X"CF";
-				end if;
-			when X"000D" => -- switch between "AB" and "CD" packets
-				switch <= not switch;
-				packet_count <= packet_count + 1;
-			when X"000E" => 
-				if packet_count > 300 then --stop sending packets after the fourth one
-					state_g_next <= X"000E";
-				end if;
-				switch_data <= "0"&X"00";
-				switch_data_rdy <= '0';
-			when X"000F" => -- send next packet
-				switch_data <= "0"&X"00";
-				switch_data_rdy <= '1';
-				state_g_next <= X"0003";
 			when others =>
-				state_g_next <= state_g;
+				state_g_next <= STATE_IDLE;
 		end case;	
 	end process;
 	
@@ -203,29 +140,15 @@ BEGIN
 	mem_proc : process(clk,rst)
 	begin
 		if (rst='1') then
-			state_g <= (others=>'0');
-			counter <= (others=>'0');
+			state_g <= STATE_IDLE;
 		elsif (rising_edge(clk)) then
-			counter <= counter_next;
-			if (thread_read_rdy='1') then
-				state_g <= state_g_next;
-			else
-				state_g <= state_g;
-			end if;
+			state_g <= state_g_next;
 		end if;
 	end process;
  
 	-- RECONOS OSIF stimulus
 	stim_proc: process
 	begin
-			MB_M_Write <= '0';	
-			-- return value for mbox_get
-			-- set buffer size (in bytes, should be word-aligned)
-			wait for clk_period*100;
-			MB_M_Write <= '1';
-			MB_M_Data <= x"00000800"; -- 2KB
-			wait for clk_period;
-			MB_M_Write <= '0';
 		loop
 			MB_M_Write <= '0';	
 			-- return value for mbox_get
@@ -236,10 +159,10 @@ BEGIN
 			wait for clk_period;
 			MB_M_Write <= '0';
 			
-			-- return for mbox_put command (value is ignored)
+			-- set amount to copy (in bytes, should be word-aligned)
 			wait for clk_period*100;
 			MB_M_Write <= '1';
-			MB_M_Data <= x"00000000";
+			MB_M_Data <= conv_std_logic_vector(64*16+4*12,32);
 			wait for clk_period;
 			MB_M_Write <= '0';
 		end loop;

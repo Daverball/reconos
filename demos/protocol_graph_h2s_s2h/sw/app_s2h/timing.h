@@ -21,16 +21,25 @@
 #ifdef USE_ECOS
 typedef unsigned int timing_t;
 typedef unsigned int ms_t;
+typedef unsigned int us_t;
+typedef signed int sign_t;
 #elif defined USE_GETTIMEOFDAY
 typedef struct timeval timing_t;
 typedef unsigned long ms_t;
+typedef unsigned long us_t;
+typedef signed long sign_t;
 #else
 typedef unsigned long timing_t;
 typedef unsigned long ms_t;
+typedef unsigned long us_t;
+typedef signed long sign_t;
 #endif
 
 timing_t gettime(  );
 ms_t calc_timediff_ms( timing_t start, timing_t stop );
+us_t calc_timediff_us( timing_t start, timing_t stop );
+us_t max(us_t a, us_t b);
+us_t min(us_t a, us_t b);
 #ifdef USE_DCR_TIMEBASE
 int init_timebase();
 void close_timebase();

@@ -99,3 +99,41 @@ ms_t calc_timediff_ms( timing_t start, timing_t stop )
 	}
 #endif
 }
+
+// calculate difference between start and stop time
+// and convert to microseconds
+us_t calc_timediff_us( timing_t start, timing_t stop )
+{
+#ifdef USE_GETTIMEOFDAY
+  us_t us;
+  struct timeval diff;
+
+  // calculate difference
+  timersub(&stop, &start, &diff);
+  // convert to miliseconds
+  us = diff.tv_sec*1000*1000+diff.tv_usec;
+  // this is very dirty, but allows to print the value via printf("%lu",ms)
+  return us;
+#else
+	if ( start <= stop ) 
+	{
+	  return (us_t)( stop - start ) / ( CLOCKS_PER_SEC / 1000000 );
+	} 
+	else 
+	{
+	  return (us_t)( ULONG_MAX - start + stop ) / ( CLOCKS_PER_SEC / 1000000 );  // Microseconds
+	}
+#endif
+}
+
+us_t max(us_t a, us_t b)
+{
+	sign_t x = b - a;
+	return a + (x & ((x < 0) - 1));
+}
+
+us_t min(us_t a, us_t b)
+{
+	sign_t x = b - a;
+	return a + (x & ((x > 0) - 1));
+}

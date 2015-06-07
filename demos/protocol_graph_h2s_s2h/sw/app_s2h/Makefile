@@ -2,7 +2,7 @@ CFLAGS=-O3 -g -Wall -I ../../../../linux/reconos/libreconos-us
 CC=microblaze-unknown-linux-gnu-gcc
 
 TARGET=app_s2h
-APP_OBJS = app_s2h.o timing.o
+APP_OBJS = app_s2h.o timing.o packetgen.o
 
 all: $(TARGET) 
 

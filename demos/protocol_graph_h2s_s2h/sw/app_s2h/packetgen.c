@@ -79,17 +79,18 @@ void *generate_packets(void * context)
 		//take into account how much we missed the previous goal
 		time_taken = calc_timediff_us(period_start, gettime()) + surplus;
 
-		//sleep as many usecs as we need to throttle throughput to desired data rate
-		if(time_taken < period)
+		//throttle to desired data rate, would like to use usleep/nanosleep but microblaze does not handle it well
+		while(time_taken < period)
 		{
-			usleep(period-time_taken);
 			time_taken = calc_timediff_us(period_start, gettime());
 		}
 
-		//we took too long, so make up for it in the following iterations
+		//we took too long, so make up for it in the following iteration
 		if(time_taken > period)
 		{
 			surplus = time_taken - period;
+		} else {
+			surplus = 0;
 		}
 
 		//signal main thread

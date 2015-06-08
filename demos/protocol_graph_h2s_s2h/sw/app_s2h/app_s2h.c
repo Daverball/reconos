@@ -34,8 +34,6 @@
 #define DEFAULT_PACKET_SIZE 64
 #define DEFAULT_BUFFER_SIZE 64*1024
 
-#define MAX_PACKET_SIZE 1500
-
 struct reconos_resource res[NUM_SLOTS][2];
 struct reconos_hwt hwt[NUM_SLOTS];
 struct mbox mb_in[NUM_SLOTS];
@@ -89,6 +87,7 @@ void print_buffer(void * buffer, size_t size) //for debugging
 
 // setup synchronization variables
 volatile void ** base_address;
+volatile unsigned int * bytes_written;
 sem_t packet_written;
 sem_t buffer_ready;
 
@@ -97,11 +96,8 @@ sem_t buffer_ready;
 int main(int argc, char *argv[])
 {
 	int i, msg_len, cnt=0, max_cnt=5;
-	unsigned int * ptr;
 	unsigned int packet_size = DEFAULT_PACKET_SIZE;
 	unsigned int aligned_size;
-	unsigned int bytes_written;
-	unsigned int num_packets;
 	pthread_t packetgen_thread;
 
 	//performance timing variables
@@ -185,7 +181,9 @@ int main(int argc, char *argv[])
 	sem_init(&packet_written, 0, -1);
 	sem_init(&buffer_ready, 0, -1);
 
-	struct generate_packets_context packetgen_context = {packet_size, data_rate, base_address, &packet_written, &buffer_ready};
+	bytes_written = malloc(sizeof(unsigned int));
+
+	struct generate_packets_context packetgen_context = {packet_size, buffer_size, data_rate, base_address, bytes_written, &packet_written, &buffer_ready};
 	pthread_create(&packetgen_thread, NULL, generate_packets, &packetgen_context);
 
 	printf("[app] Sending packets...\n");
@@ -194,37 +192,26 @@ int main(int argc, char *argv[])
 	reconos_cache_flush();
 
 	// send packets
-	ptr = (unsigned int *) shared_mem_s2h; //location of num_packets in buffer
 	while(cnt < max_cnt) 
 	{
 		start = gettime();
 
-		bytes_written = 4;
-		num_packets = 0;
-		*base_address = ((char *) shared_mem_s2h) + 4;
+		*base_address = ((char *) shared_mem_s2h);
 
-		// as long as there is still space write packets to buffer
-		while((bytes_written + MAX_PACKET_SIZE) < buffer_size)
-		{
-			//synchronize worker thread
-			sem_post(&buffer_ready);
+		//synchronize worker thread
+		sem_post(&buffer_ready);
 
-			//wait on worker thread to finish
-			sem_wait(&packet_written);
-			*base_address = ((char *) *base_address) + aligned_size;
-			num_packets++;
-			bytes_written += aligned_size;
-		}
-		*ptr = num_packets;
+		//wait on worker thread to finish
+		sem_wait(&packet_written);
 
 		// 1. send length
-		mbox_put(&mb_in[HWT_S2H], (unsigned int) bytes_written);
+		mbox_put(&mb_in[HWT_S2H], (unsigned int) *bytes_written);
 
 		// 2. wait for ack
 		msg_len = mbox_get(&mb_out[HWT_S2H]);
 
 		// 3. set next s2h shared mem addr
-		mbox_put(&mb_in[HWT_S2H], (unsigned int) ptr);
+		mbox_put(&mb_in[HWT_S2H], (unsigned int) shared_mem_s2h);
 
 		cnt++;
 		time_taken = calc_timediff_us(start, gettime());
@@ -236,7 +223,7 @@ int main(int argc, char *argv[])
 	}
 
 	latency_avg = latency_total/cnt;
-	double data_rate_achieved = ((double) (cnt*(bytes_written-4)))/((double) latency_total);
+	double data_rate_achieved = ((double) (cnt*(*bytes_written)))/((double) latency_total);
 	data_rate_achieved *= 8.0/(1.024*1.024); //convert from bytes/us to MBit/s
 	printf("\n\n[app] Performance results:\n\tData Rate: %.3f MBit/s\n\tLatency:\n\t\tavg: %dus \n\t\tmin: %dus \n\t\tmax: %dus", data_rate_achieved, (int) latency_avg, (int) latency_min, (int) latency_max);
 

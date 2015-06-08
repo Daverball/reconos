@@ -20,9 +20,12 @@
 #include "packetgen.h"
 #include "timing.h"
 
+#define MAX_PACKET_SIZE 1500
+
 void *generate_packets(void * context)
 {
 	unsigned char * ptr;
+	unsigned int * word_ptr;
 	int i;
 	struct noc_header * head_ptr;
 	struct generate_packets_context * c = (struct generate_packets_context *) context;
@@ -31,29 +34,47 @@ void *generate_packets(void * context)
 	timing_t period_start;
 
 	unsigned int payload_size = c->packet_size-12;
+	unsigned int aligned_size = 4*((c->packet_size+3)/4);
+	unsigned int num_packets = ((c->buffer_size-1504) + (aligned_size-1))/aligned_size;
 	struct noc_header header = {1, 0, 0, 0, 0, 0, payload_size, 3, 2};
+	unsigned char * payload = malloc(payload_size);
+	for(i=0; i<payload_size; i++)
+	{
+		payload[i] = 0xA0 + i%4;
+	}
+	payload[payload_size-1] += 0x50; //mark last byte with A+5 = F
 
 	if(c->data_rate > 0) //only set a period > 0 for a data_rate > 0
 	{
 		double packet_rate = 128.0*((double) c->data_rate)/((double) c->packet_size); //packets/s
-		period = (us_t) (1000000.0/packet_rate); //usecs/packet
+		period = (us_t) (num_packets*(1000000.0/packet_rate)); //usecs/buffer
 	}
 	for(;;)
 	{
 		period_start = gettime();
 		sem_wait(c->buffer_ready);
+		*c->bytes_written = 0;
 
-		//setup write pointers
-		head_ptr = (struct noc_header *) *(c->base_address);
+		//setup write pointers and write num_packets
+		word_ptr = (unsigned int *) *(c->base_address);
+		*word_ptr = num_packets;
+		word_ptr += 1;
+		head_ptr = (struct noc_header *) word_ptr;
 		ptr = ((unsigned char *) head_ptr) + 12;
 
-		//write packet
-		*head_ptr = header;
-		for(i=0; i<payload_size; i++)
+		//fill buffer with packets
+		for(i=0; i<num_packets; i++)
 		{
-			ptr[i] = 0xA0 + i%4;
+			//write packet
+			*head_ptr = header;
+			memcpy(ptr, payload, payload_size);
+			*c->bytes_written += aligned_size;
+
+			//advance pointers
+			ptr = ((unsigned char *) head_ptr) + aligned_size;
+			head_ptr = (struct noc_header *) ptr;
+			ptr += 12;
 		}
-		ptr[payload_size-1] += 0x50; //mark last byte with A+5 = F
 
 		//take into account how much we missed the previous goal
 		time_taken = calc_timediff_us(period_start, gettime()) + surplus;

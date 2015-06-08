@@ -23,8 +23,10 @@ struct noc_header {
 
 struct generate_packets_context {
 	unsigned int packet_size;
+	unsigned int buffer_size;
 	signed int data_rate;
 	volatile void ** base_address; // read-only for thread
+	volatile unsigned int * bytes_written;
 	sem_t * packet_written; // exclusive write for thread
 	sem_t * buffer_ready; // read-only for thread
 };

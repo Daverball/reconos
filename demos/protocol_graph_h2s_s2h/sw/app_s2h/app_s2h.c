@@ -32,7 +32,7 @@
 
 #define DEFAULT_DATA_RATE -1
 #define DEFAULT_PACKET_SIZE 64
-#define DEFAULT_BUFFER_SIZE 64*1024
+#define DEFAULT_BUFFER_SIZE 1*1024
 
 struct reconos_resource res[NUM_SLOTS][2];
 struct reconos_hwt hwt[NUM_SLOTS];
@@ -60,10 +60,10 @@ void config_eth(unsigned int hash_1, unsigned int hash_2, unsigned int idp, int 
 
 void setup_noc(void)
 {
-	shared_mem_h2s = malloc(buffer_size); 
-	memset(shared_mem_h2s, 0, buffer_size);
-	shared_mem_s2h = malloc(buffer_size); 
-	memset(shared_mem_s2h, 0, buffer_size);
+	shared_mem_h2s = malloc(max(buffer_size, 2048)); //allocate at least 2KB
+	memset(shared_mem_h2s, 0, max(buffer_size, 2048));
+	shared_mem_s2h = malloc(max(buffer_size, 2048)); 
+	memset(shared_mem_s2h, 0, max(buffer_size, 2048));
 	mbox_put(&mb_in[HWT_H2S], (unsigned int) shared_mem_h2s);
 	mbox_put(&mb_in[HWT_S2H], (unsigned int) shared_mem_s2h);
 	config_eth(0xabababab, 0xabababab, 3, TO_H2S); // SW
@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 	aligned_size = 4*((packet_size+3)/4); //round up to next word boundary
 	assert((aligned_size & 3) == 0); // make sure size is aligned
 
-	if(argc > 2 && atoi(argv[2])>1 && atoi(argv[2])<65 )
+	if(argc > 2 && atoi(argv[2])>0 && atoi(argv[2])<65 )// 1KB -> single packet buffering
 	{
 		buffer_size = 1024*atoi(argv[2]);
 	} else {
@@ -142,10 +142,26 @@ int main(int argc, char *argv[])
 	if(argc > 3 && atoi(argv[3])>-2)
 	{
 		data_rate = atoi(argv[3]);
-		printf("[app] Sending packets of size %d with a buffer of size %dKB at %.3f MBit/s.\n", packet_size, buffer_size/1024, ((float) data_rate)/1024.0f);
 	} else {
 		printf("[app] Received no valid data rate for argument 3 using unlimited mode.\n");
-		printf("[app] Sending packets of size %d with a buffer of size %d at max throughput.\n", packet_size, buffer_size);
+	}
+	
+	printf("[app] Sending packets of size %d Bytes ", packet_size);
+	if(buffer_size >= 2048)
+	{
+		printf("with a buffer of size %dKB ", buffer_size/1024); 
+	}
+	else //single packet buffering
+	{
+		printf("with single packet buffering "); 
+	}
+	if(data_rate>0)
+	{
+		printf("at %d KBit/s.\n", data_rate);
+	}
+	else
+	{
+		printf("at max throughput.\n");
 	}
 
 	#ifdef USE_DCR_TIMEBASE
@@ -224,8 +240,8 @@ int main(int argc, char *argv[])
 
 	latency_avg = latency_total/cnt;
 	double data_rate_achieved = ((double) (cnt*(*bytes_written)))/((double) latency_total);
-	data_rate_achieved *= 8.0/(1.024*1.024); //convert from bytes/us to MBit/s
-	printf("\n\n[app] Performance results:\n\tData Rate: %.3f MBit/s\n\tLatency:\n\t\tavg: %dus \n\t\tmin: %dus \n\t\tmax: %dus", data_rate_achieved, (int) latency_avg, (int) latency_min, (int) latency_max);
+	data_rate_achieved *= 1000.0*8.0/(1.024); //convert from bytes/us to KBit/s
+	printf("\n\n[app] Performance results:\n\tData Rate: %.1f KBit/s\n\tLatency:\n\t\tavg: %dus \n\t\tmin: %dus \n\t\tmax: %dus", data_rate_achieved, (int) latency_avg, (int) latency_min, (int) latency_max);
 
 	printf("\n\n[app] Print first KB of final buffer");
 	print_buffer(shared_mem_s2h, 1024);

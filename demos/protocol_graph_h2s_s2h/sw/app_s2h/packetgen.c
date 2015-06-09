@@ -36,6 +36,11 @@ void *generate_packets(void * context)
 	unsigned int payload_size = c->packet_size-12;
 	unsigned int aligned_size = 4*((c->packet_size+3)/4);
 	unsigned int num_packets = ((c->buffer_size-1504) + (aligned_size-1))/aligned_size;
+	if(c->buffer_size < MAX_PACKET_SIZE) //if we specified less than max packet size we want to use single packet buffering
+	{
+		num_packets = 1;
+	}
+	num_packets = max(num_packets, 1); //always write at least one packet
 	struct noc_header header = {1, 0, 0, 0, 0, 0, payload_size, 3, 2};
 	unsigned char * payload = malloc(payload_size);
 	for(i=0; i<payload_size; i++)

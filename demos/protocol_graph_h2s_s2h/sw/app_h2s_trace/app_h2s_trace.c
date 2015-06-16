@@ -29,7 +29,8 @@
 
 #define DEFAULT_BUFFER_SIZE 64*1024
 #define DEFAULT_TIMEOUT_MS 10
-#define DEFAULT_PACKETS_TO_RECEIVE 16*1024
+#define DEFAULT_DURATION_S 180
+#define DEFAULT_TIMESTEP_MS 500
 
 #define MAX_LINES_PER_PACKET 4
 
@@ -48,7 +49,8 @@ unsigned char *shared_mem_s2h;
 
 unsigned int buffer_size = DEFAULT_BUFFER_SIZE;
 unsigned int timeout_ms = DEFAULT_TIMEOUT_MS;
-unsigned int max_cnt = DEFAULT_PACKETS_TO_RECEIVE;
+ms_t duration_ms = DEFAULT_DURATION_S*1000;
+ms_t timestep_ms = DEFAULT_TIMESTEP_MS;
 
 
 void config_eth(unsigned int hash_1, unsigned int hash_2, unsigned int idp, int addr)
@@ -99,14 +101,14 @@ void print_buffer(void * buffer, size_t size) //for debugging
 // MAIN ////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-	int i, k, cnt=1, buf_cnt=1, packet_count;
+	int i, k, cnt=0, packet_count;
 	unsigned int * ptr = (unsigned int *) shared_mem_h2s;
 	unsigned short msg_len;
 	unsigned int checksum=0;
 	unsigned int total_bytes_received=0;
 
 	//performance timing variables
-	us_t time_taken, latency_total=0, latency_avg, latency_max=0, latency_min=1000000;
+	ms_t time_taken, total_time_taken = 0;
 	timing_t start;
 
 	printf( "-------------------------------------------------------\n"
@@ -120,11 +122,12 @@ int main(int argc, char *argv[])
 	               )
 	)
 	{
-		printf("Usage: ./app_h2s [buffer_size] [timeout] [num_packets]\n");
+		printf("Usage: ./app_h2s_trace [buffer_size] [timeout] [duration] [timestep]\n");
 		printf("\tbuffer_size:\tbuffer size in kB\t(default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
 		printf("\tnote: 1kB turns on single packet buffering.\n\n");
 		printf("\ttimeout:\ttimeout in ms\t(default value: %d)\n", DEFAULT_TIMEOUT_MS);
-		printf("\tnum_packets:\thow many packets to receive\t(default value: %d)\n", DEFAULT_PACKETS_TO_RECEIVE);
+		printf("\tduration:\tduration of trace in s\t(default value: %d)\n", DEFAULT_DURATION_S);
+		printf("\ttimestep:\ttimestep between measurements in ms\t(default value: %d)\n", DEFAULT_TIMESTEP_MS);
 		return 0;
 	}
 	
@@ -144,12 +147,19 @@ int main(int argc, char *argv[])
 
 	if(argc > 3 && atoi(argv[3])>0)
 	{
-		max_cnt = atoi(argv[3]);
+		duration_ms = 1000*atoi(argv[3]);
 	} else {
-		printf("[app] Number of packets to receive needs to be bigger than zero, using default.\n");
+		printf("[app] Duration needs to be longer than zero, using default.\n");
+	}
+
+	if(argc > 4 && atoi(argv[4])>0)
+	{
+		timestep_ms = atoi(argv[4]);
+	} else {
+		printf("[app] Timestep needs to be longer than zero, using default.\n");
 	}
 	
-	printf("[app] Receving %d packets ", max_cnt);
+	printf("[app] Starting trace for %ds with timesteps of %dms ", (int) duration_ms/1000, (int) timestep_ms);
 	if(buffer_size >= 2048)
 	{
 		printf("with a buffer of size %dkB ", buffer_size/1024); 
@@ -181,27 +191,25 @@ int main(int argc, char *argv[])
 	printf("[app] Setup NoC\n");
 	setup_noc();
 
-	printf("[app] Waiting for packets...\n");
+	printf("[app] Starting trace...\n\nstep\tKBit/s\n");
 	#ifdef USE_DCR_TIMEBASE
 	init_timebase();
 	#endif
 	// receive packets
+	start = gettime();
 	while(1) {
-		start = gettime();
 		// send ack to h2s
 		mbox_put(&mb_in[HWT_H2S],(unsigned int) shared_mem_h2s);
 		
 		// receive message from h2s
 		packet_count = mbox_get(&mb_out[HWT_H2S]);
-		
-		//printf("\n\n[app] Buffer no. %03d with %d packets.\n",buf_cnt, packet_count);
 
 		// flush cache
 		reconos_cache_flush();
 		k=0;
 
 		ptr = (unsigned int *) shared_mem_h2s;
-		while(k < packet_count && cnt <= max_cnt){
+		while(k < packet_count){
 			msg_len = *(((unsigned short *) ptr) + 1); //get msg_len out of packet header
 			msg_len += 12; //expand message length by length of header
 			total_bytes_received += msg_len;
@@ -219,28 +227,26 @@ int main(int argc, char *argv[])
 			  case 3: checksum += *(ptr++) & 0xFFFFFF00; break;
 			  default: break;
 			}
-			//printf("Checksum = 0x%08x\n",checksum);
-			cnt++;
 			k++;
 		}
-		time_taken = calc_timediff_us(start, gettime());
-		latency_total += time_taken;
-		latency_max = max(latency_max, time_taken);
-		latency_min = min(latency_min, time_taken);
+		time_taken = calc_timediff_ms(start, gettime());
 
-		// stop after max_cnt packets
-		if(cnt >= max_cnt)
+		if(time_taken >= timestep_ms)
+		{
+			start = gettime();
+			total_time_taken += time_taken;
+			double data_rate_achieved = ((double) (total_bytes_received))/((double) time_taken);
+			data_rate_achieved *= 8.0/(1.024); //convert from bytes/ms to KBit/s
+			printf("%d\t%.0f\n", cnt, data_rate_achieved);
+			cnt++;
+			total_bytes_received = 0;
+		}
+
+		// stop trace after duration
+		if(total_time_taken >= duration_ms)
 			break;
-		buf_cnt++;
 	}
-	latency_avg = latency_total / buf_cnt;
-	double data_rate_achieved = ((double) (total_bytes_received))/((double) latency_total);
-	data_rate_achieved *= 1000.0*8.0/(1.024); //convert from bytes/us to KBit/s
-	printf("\n\n[app] Performance results:\n\tData Rate: %.1f KBit/s\n\tLatency:\n\t\tavg: %dus \n\t\tmin: %dus \n\t\tmax: %dus", data_rate_achieved, (int) latency_avg, (int) latency_min, (int) latency_max);
-
-	printf("\n\n[app] Print first KB of final buffer");
-	print_buffer(shared_mem_h2s, 1024);
-	
+	printf("\n[app] Finished trace.\n");
 	#ifdef USE_DCR_TIMEBASE
 	close_timebase();
 	#endif

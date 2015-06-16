@@ -21,7 +21,7 @@
          </top_modules>
       </db_ref>
    </db_ref_list>
-   <WVObjectSize size="43" />
+   <WVObjectSize size="42" />
    <wvobject fp_name="/hwt_h2s_tb/rst" type="logic" db_ref_id="1">
       <obj_property name="ElementShortName">rst</obj_property>
       <obj_property name="ObjectShortName">rst</obj_property>
@@ -46,16 +46,20 @@
       <obj_property name="Radix">HEXRADIX</obj_property>
    </wvobject>
    <wvobject fp_name="/hwt_h2s_tb/uut/total_packet_len" type="array" db_ref_id="1">
-      <obj_property name="ElementShortName">total_packet_len[31:0]</obj_property>
-      <obj_property name="ObjectShortName">total_packet_len[31:0]</obj_property>
+      <obj_property name="ElementShortName">total_packet_len[21:0]</obj_property>
+      <obj_property name="ObjectShortName">total_packet_len[21:0]</obj_property>
    </wvobject>
-   <wvobject fp_name="/hwt_h2s_tb/uut/receiving_to_ram_en" type="logic" db_ref_id="1">
-      <obj_property name="ElementShortName">receiving_to_ram_en</obj_property>
-      <obj_property name="ObjectShortName">receiving_to_ram_en</obj_property>
+   <wvobject fp_name="/hwt_h2s_tb/uut/buffer_limit" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">buffer_limit[31:0]</obj_property>
+      <obj_property name="ObjectShortName">buffer_limit[31:0]</obj_property>
    </wvobject>
-   <wvobject fp_name="/hwt_h2s_tb/uut/receiving_to_ram_done" type="logic" db_ref_id="1">
-      <obj_property name="ElementShortName">receiving_to_ram_done</obj_property>
-      <obj_property name="ObjectShortName">receiving_to_ram_done</obj_property>
+   <wvobject fp_name="/hwt_h2s_tb/uut/timeout_ms" type="array" db_ref_id="1">
+      <obj_property name="ElementShortName">timeout_ms[31:0]</obj_property>
+      <obj_property name="ObjectShortName">timeout_ms[31:0]</obj_property>
+   </wvobject>
+   <wvobject fp_name="/hwt_h2s_tb/uut/timeout_cycles" type="other" db_ref_id="1">
+      <obj_property name="ElementShortName">timeout_cycles</obj_property>
+      <obj_property name="ObjectShortName">timeout_cycles</obj_property>
    </wvobject>
    <wvobject fp_name="divider42" type="divider">
       <obj_property name="label">Timeout Counter</obj_property>
@@ -90,16 +94,8 @@
       <obj_property name="ObjectShortName">packet_count</obj_property>
    </wvobject>
    <wvobject fp_name="/hwt_h2s_tb/uut/local_base_addr" type="array" db_ref_id="1">
-      <obj_property name="ElementShortName">local_base_addr[0:10]</obj_property>
-      <obj_property name="ObjectShortName">local_base_addr[0:10]</obj_property>
-   </wvobject>
-   <wvobject fp_name="/hwt_h2s_tb/uut/packet_counter_en" type="logic" db_ref_id="1">
-      <obj_property name="ElementShortName">packet_counter_en</obj_property>
-      <obj_property name="ObjectShortName">packet_counter_en</obj_property>
-   </wvobject>
-   <wvobject fp_name="/hwt_h2s_tb/uut/packet_counter_done" type="logic" db_ref_id="1">
-      <obj_property name="ElementShortName">packet_counter_done</obj_property>
-      <obj_property name="ObjectShortName">packet_counter_done</obj_property>
+      <obj_property name="ElementShortName">local_base_addr[0:13]</obj_property>
+      <obj_property name="ObjectShortName">local_base_addr[0:13]</obj_property>
    </wvobject>
    <wvobject fp_name="divider83" type="divider">
       <obj_property name="label">Receive 2 RAM</obj_property>
@@ -153,8 +149,8 @@
       <obj_property name="ObjectShortName">o_ramwe_sender</obj_property>
    </wvobject>
    <wvobject fp_name="/hwt_h2s_tb/uut/o_ramaddr_sender" type="array" db_ref_id="1">
-      <obj_property name="ElementShortName">o_ramaddr_sender[0:10]</obj_property>
-      <obj_property name="ObjectShortName">o_ramaddr_sender[0:10]</obj_property>
+      <obj_property name="ElementShortName">o_ramaddr_sender[0:13]</obj_property>
+      <obj_property name="ObjectShortName">o_ramaddr_sender[0:13]</obj_property>
       <obj_property name="Radix">HEXRADIX</obj_property>
    </wvobject>
    <wvobject fp_name="/hwt_h2s_tb/uut/o_ramdata_sender" type="array" db_ref_id="1">

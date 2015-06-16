@@ -185,7 +185,7 @@ BEGIN
 				switch <= not switch;
 				packet_count <= packet_count + 1;
 			when X"000E" => 
-				if packet_count > 4 then --stop sending packets after the fourth one
+				if packet_count > 300 then --stop sending packets after the fourth one
 					state_g_next <= X"000E";
 				end if;
 				switch_data <= "0"&X"00";
@@ -218,21 +218,39 @@ BEGIN
 	-- RECONOS OSIF stimulus
 	stim_proc: process
 	begin
-		MB_M_Write <= '0';	
-		-- return value for mbox_get
-		-- set addr (in bytes, should be word-aligned)
-		wait for clk_period*100;
-		MB_M_Write <= '1';
-		MB_M_Data <= x"00000000";
-		wait for clk_period;
-		MB_M_Write <= '0';
-		
-		-- return for mbox_put command (value is ignored)
-		wait for clk_period*100;
-		MB_M_Write <= '1';
-		MB_M_Data <= x"00000000";
-		wait for clk_period;
-		MB_M_Write <= '0';
+			MB_M_Write <= '0';	
+			-- return value for mbox_get
+			-- set buffer size (in bytes, should be word-aligned)
+			wait for clk_period*100;
+			MB_M_Write <= '1';
+			MB_M_Data <= x"00000800"; -- 2KB
+			wait for clk_period;
+			MB_M_Write <= '0';
+			MB_M_Write <= '0';	
+			-- return value for mbox_get
+			-- set timeout (in ms)
+			wait for clk_period*100;
+			MB_M_Write <= '1';
+			MB_M_Data <= x"00000010"; -- 16ms
+			wait for clk_period;
+			MB_M_Write <= '0';
+		loop
+			MB_M_Write <= '0';	
+			-- return value for mbox_get
+			-- set addr (in bytes, should be word-aligned)
+			wait for clk_period*100;
+			MB_M_Write <= '1';
+			MB_M_Data <= x"00000000";
+			wait for clk_period;
+			MB_M_Write <= '0';
+			
+			-- return for mbox_put command (value is ignored)
+			wait for clk_period*100;
+			MB_M_Write <= '1';
+			MB_M_Data <= x"00000000";
+			wait for clk_period;
+			MB_M_Write <= '0';
+		end loop;
 		
 	end process;
 	

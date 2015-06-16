@@ -84,7 +84,7 @@ architecture implementation of hwt_s2h is
 	signal ignore   : std_logic_vector(C_FSL_WIDTH-1 downto 0);
 
 	-- IMPORTANT: define size of local RAM here!!!! 
-	constant C_LOCAL_RAM_SIZE          : integer := 2048;
+	constant C_LOCAL_RAM_SIZE          : integer := 16384; --64kB
 	constant C_LOCAL_RAM_ADDRESS_WIDTH : integer := clog2(C_LOCAL_RAM_SIZE);
 	constant C_LOCAL_RAM_SIZE_IN_BYTES : integer := 4*C_LOCAL_RAM_SIZE;
 	
@@ -118,8 +118,8 @@ architecture implementation of hwt_s2h is
 	signal packet_count        : integer range 0 to (C_LOCAL_RAM_SIZE_IN_BYTES/C_MIN_PACKET_LEN + 1);
 	signal local_base_addr     : std_logic_vector(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
 	signal buffer_limit        : std_logic_vector(31 downto 0);
-	signal packet_counter_en   : std_logic;
-	signal packet_counter_done : std_logic;
+	signal packet_manager_en   : std_logic;
+	signal packet_manager_done : std_logic;
 
 	type SENDING_STATE_TYPE_T is (STATE_IDLE, STATE_READ_LEN_WAIT_A, STATE_WAIT_IDP_A, STATE_READ_LEN,STATE_SRCIDP, STATE_DSTIDP, STATE_WAIT_SOF,
 						STATE_SEND_SOF, STATE_SEND_SECOND, STATE_SEND_THIRD, STATE_SEND_FOURTH, 
@@ -166,8 +166,8 @@ architecture implementation of hwt_s2h is
 	
 	signal tx_data_word : std_logic_vector(0 to 31);
 	
-	signal send_packets_done : std_logic;
-	signal send_packets_en : std_logic;
+	signal send_packet_done : std_logic;
+	signal send_packet_en : std_logic;
 	
 	signal base_addr : std_logic_vector(31 downto 0);
 	signal len		: std_logic_vector(31 downto 0);
@@ -212,7 +212,7 @@ begin
 --	);
 --	--end generate;
 --
---	trig0 <= rst & "0" & send_packets_en & send_packets_done;
+--	trig0 <= rst & "0" & send_packet_en & send_packet_done;
 --	trig1 <= reconos_fsm & fsm_step;
 --	trig2 <= tx_ll_sof & tx_ll_eof & tx_ll_src_rdy & tx_ll_dst_rdy;
 --	trig3 <= tx_ll_data;
@@ -304,9 +304,9 @@ begin
 	rx_ll_dst_rdy_local <= '1';
 
 	-- send packet from RAM
-	sending_from_ram : process (clk, rst, send_packets_en)
+	send_packet : process (clk, rst, send_packet_en)
 	begin
-		if rst = '1' or send_packets_en='0' then
+		if rst = '1' or send_packet_en='0' then
 			o_RAMAddr_sender <= (others => '0');
 			sending_state <= STATE_IDLE;
 			tx_ll_src_rdy <= '0';
@@ -323,7 +323,7 @@ begin
 			priority  <= (others  => '0');
 			direction  <= '0';
 			latencycritical  <= '0';
-			send_packets_done<='0';
+			send_packet_done<='0';
 			srcIdp  <= (others  => '0');
 			dstIdp  <= (others  => '0');		
 			fsm_step <= "00000";
@@ -337,7 +337,7 @@ begin
 		case sending_state is
 			when STATE_IDLE =>
 				fsm_step <= "00001";
-				send_packets_done<='0';
+				send_packet_done<='0';
 				tx_ll_src_rdy <= '0';
 				payload_count <= 0;
 				o_RAMAddr_sender <= local_base_addr; 			-- Addr 0
@@ -472,7 +472,7 @@ begin
 				--if tx_ll_dst_rdy = '1' then
 					--if unsigned(o_RAMAddr_sender + 1) >= unsigned(len(16 downto 2)) then 
 					sending_state <= STATE_WAIT;
-					send_packets_done <= '1';
+					send_packet_done <= '1';
 					packets_sent <= '1';
 					--else
 					--	sending_state  <= STATE_READ_LEN_WAIT_A;
@@ -484,7 +484,7 @@ begin
 			when STATE_WAIT =>
 				fsm_step <= "10010";
 				--packets_sent <= '1';
-				send_packets_done <= '1';
+				send_packet_done <= '1';
 				--sending_state <= STATE_IDLE;
 			when others => 
 				fsm_step <= "11111";
@@ -550,20 +550,20 @@ begin
 	    end if;
 	end process;
 	
-	-- packet_counter_fsm keeps track of where in local RAM the next packet is
+	-- packet_manager_fsm keeps track of where in local RAM the next packet is
 	-- and makes sure we stop once there are no more packets remaining
-	packet_counter_fsm: process (clk,rst,packet_counter_en) is
+	packet_manager: process (clk, rst, packet_manager_en) is
 	variable base_addr_tmp : unsigned(0 to C_LOCAL_RAM_ADDRESS_WIDTH-1);
 	begin
-		if rst = '1' or packet_counter_en = '0' then
+		if rst = '1' or packet_manager_en = '0' then
 			local_base_addr <= (others => '0');
 			packet_count <= 0;
 			counter_state <= STATE_INIT1;
-			send_packets_en <= '0';
-			packet_counter_done <= '0';
+			send_packet_en <= '0';
+			packet_manager_done <= '0';
 		elsif rising_edge(clk) then
-			send_packets_en <= '0';
-			packet_counter_done <= '0';
+			send_packet_en <= '0';
+			packet_manager_done <= '0';
 			case counter_state is
 				-- we don't need to set RAM address since it will always be reset to 0
 				when STATE_INIT1 =>
@@ -576,10 +576,10 @@ begin
 				when STATE_GET_NUM =>
 					packet_count <= to_integer(unsigned(i_RAMData_sender));
 					counter_state <= STATE_WAIT;
-				-- wait for sending_from_ram to do its job
+				-- wait for send_packet to do its job
 				when STATE_WAIT =>
-					send_packets_en <= '1';
-					if send_packets_done = '1' then
+					send_packet_en <= '1';
+					if send_packet_done = '1' then
 						counter_state <= STATE_INCREMENT;
 					end if;
 				-- increment packet count and base address
@@ -593,7 +593,7 @@ begin
 						counter_state <= STATE_DONE;
 					end if;
 				when STATE_DONE =>
-					packet_counter_done <= '1';
+					packet_manager_done <= '1';
 				when others =>
 					counter_state <= STATE_INIT1;
 			end case;
@@ -613,43 +613,43 @@ begin
 			base_addr <= (others => '0');
 			len <= (others => '0');
 			data_ready <= '0';
-			packet_counter_en <= '0';
+			packet_manager_en <= '0';
 			reconos_fsm <= "000";
 		elsif rising_edge(clk) then
 			data_ready <= '0';
-			packet_counter_en <= '1';
+			packet_manager_en <= '1';
 			case state is
             -- get main memory address of packet buffer
 				when STATE_INIT =>
 					reconos_fsm <= "001";
 					osif_mbox_get(i_osif, o_osif, MBOX_RECV, base_addr, done);
-					packet_counter_en <= '0';
-					if done and base_addr=0 then -- hack to synchronize
+					packet_manager_en <= '0';
+					if done then
 						state <= STATE_GET_LEN;
 						base_addr <= base_addr(31 downto 2) & "00";
 					end if;				
 				-- get number of bytes to be copied from main memory
 				when STATE_GET_LEN =>
 					reconos_fsm <= "010";
-					packet_counter_en <= '0';
+					packet_manager_en <= '0';
 					osif_mbox_get(i_osif, o_osif, MBOX_RECV, len, done);
-					if done and len>0 then -- hack to synchronize
+					if done then
 						state <= STATE_READ;
 					end if;
 				-- copy data from main memory to local memory
 				when STATE_READ =>
 					reconos_fsm <= "011";
 					memif_read(i_ram,o_ram,i_memif,o_memif, base_addr, X"00000000", len(23 downto 0) + 4, done); --this is off by one word for some reason
-					packet_counter_en <= '0';
+					packet_manager_en <= '0';
 					if done then
 						state <= STATE_WAIT;
-						packet_counter_en <= '1';
+						packet_manager_en <= '1';
 					end if;
 				-- wait for packet to be send
 				when STATE_WAIT =>
 					reconos_fsm <= "100";
 					--if packets_sent = '1' then
-					if packet_counter_done = '1' then
+					if packet_manager_done = '1' then
 						state <= STATE_PUT; 
 						data_ready <= '0';
 						len  <= (others  => '0');
@@ -662,7 +662,7 @@ begin
 				-- thread exit
 				when STATE_THREAD_EXIT =>
 					reconos_fsm <= "111";
-					packet_counter_en <= '0';
+					packet_manager_en <= '0';
 					osif_thread_exit(i_osif,o_osif);					
 				when others =>
 					reconos_fsm <= "110";

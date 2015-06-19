@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
 	printf("[app] Setup NoC\n");
 	setup_noc();
 
-	printf("[app] Starting trace...\n\nstep\tKBit/s\n");
+	printf("[app] Starting trace...\n\nms\tKBit/s\n");
 	#ifdef USE_DCR_TIMEBASE
 	init_timebase();
 	#endif
@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
 			total_time_taken += time_taken;
 			double data_rate_achieved = ((double) (total_bytes_received))/((double) time_taken);
 			data_rate_achieved *= 8.0/(1.024); //convert from bytes/ms to KBit/s
-			printf("%d\t%.0f\n", cnt, data_rate_achieved);
+			printf("%d\t%.0f\n", (int) total_time_taken, data_rate_achieved);
 			cnt++;
 			total_bytes_received = 0;
 		}

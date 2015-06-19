@@ -32,7 +32,9 @@
 
 #define DEFAULT_DATA_RATE -1
 #define DEFAULT_PACKET_SIZE 64
-#define DEFAULT_BUFFER_SIZE 1*1024
+#define DEFAULT_BUFFER_SIZE 64*1024
+#define DEFAULT_TIMEOUT_MS 10
+#define DEFAULT_PACKETS_TO_SEND 16*1024
 
 struct reconos_resource res[NUM_SLOTS][2];
 struct reconos_hwt hwt[NUM_SLOTS];
@@ -44,6 +46,8 @@ unsigned char *shared_mem_s2h;
 
 unsigned int buffer_size = DEFAULT_BUFFER_SIZE;
 signed int data_rate = DEFAULT_DATA_RATE;
+unsigned int timeout_ms = DEFAULT_TIMEOUT_MS;
+unsigned int max_cnt = DEFAULT_PACKETS_TO_SEND;
 
 void config_eth(unsigned int hash_1, unsigned int hash_2, unsigned int idp, int addr)
 {
@@ -95,7 +99,7 @@ sem_t buffer_ready;
 // MAIN ////////////////////////////////////////////////////////////////////
 int main(int argc, char *argv[])
 {
-	int i, msg_len, cnt=0, max_cnt=5;
+	int i, msg_len, cnt=0, buf_cnt=0;
 	unsigned int packet_size = DEFAULT_PACKET_SIZE;
 	unsigned int aligned_size;
 	pthread_t packetgen_thread;
@@ -115,38 +119,55 @@ int main(int argc, char *argv[])
 				   )
 	  )
 	{
-		printf("Usage: ./app_s2h [packet_size] [buffer_size] [data_rate]\n");
-		printf("\tpacket_size:\tpacket size in Bytes\t(default value %d)\n", DEFAULT_PACKET_SIZE);
-		printf("\tbuffer_size:\tbuffer size in KBytes\t(default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
-		printf("\tdata_rate:\tdata rate in KBit/s\t(default value: %d, unlimited)\n", DEFAULT_DATA_RATE);
+		printf("Usage: ./app_s2h [buffer_size] [timeout] [packet_size] [data_rate] [num_packets]\n");
+		printf("\tbuffer_size:\tbuffer size in KB (default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
+		printf("\t\t\t(note:) 1 turns on single packet buffering.\n\n");
+		printf("\ttimeout:\ttimeout in ms (default value %d)\n", DEFAULT_TIMEOUT_MS);
+		printf("\tpacket_size:\tpacket size in Bytes (default value %d)\n", DEFAULT_PACKET_SIZE);
+		printf("\tdata_rate:\tdata rate in KBit/s (default value: %d, unlimited)\n", DEFAULT_DATA_RATE);
+		printf("\tnum_packets:\thow many packets to send (default value %d)\n", DEFAULT_PACKETS_TO_SEND);
 		return 0;
 	}
-	
-	if(argc > 1 && atoi(argv[1])>63 && atoi(argv[1])<1501 )
+
+	if(argc > 1 && atoi(argv[1])>0)// 1KB -> single packet buffering
 	{
-		packet_size = atoi(argv[1]);
+		buffer_size = 1024*atoi(argv[1]);
 	} else {
-		printf("[app] Received no valid packet size for argument 1 using default.\n");
+		printf("[app] Received no valid buffer size in KB for argument 1 using default.\n");
+	}
+	
+	if(argc > 2 && atoi(argv[2])>0)
+	{
+		timeout_ms = atoi(argv[2]);
+	} else {
+		printf("[app] Timeout needs to be larger than 0 using default.\n");
+	}
+	
+	if(argc > 3 && atoi(argv[3])>63 && atoi(argv[3])<1501 )
+	{
+		packet_size = atoi(argv[3]);
+	} else {
+		printf("[app] Received no valid packet size for argument 3 using default.\n");
 	}
 
 	aligned_size = 4*((packet_size+3)/4); //round up to next word boundary
 	assert((aligned_size & 3) == 0); // make sure size is aligned
 
-	if(argc > 2 && atoi(argv[2])>0 && atoi(argv[2])<65 )// 1KB -> single packet buffering
+	if(argc > 4 && atoi(argv[4])>-2)
 	{
-		buffer_size = 1024*atoi(argv[2]);
+		data_rate = atoi(argv[4]);
 	} else {
-		printf("[app] Received no valid buffer size in KBytes for argument 2 using default.\n");
+		printf("[app] Received no valid data rate for argument 4 using unlimited mode.\n");
 	}
 
-	if(argc > 3 && atoi(argv[3])>-2)
+	if(argc > 5 && atoi(argv[5])>0)
 	{
-		data_rate = atoi(argv[3]);
+		max_cnt = atoi(argv[4]);
 	} else {
-		printf("[app] Received no valid data rate for argument 3 using unlimited mode.\n");
+		printf("[app] Packets to send needs to be larger than zero.\n");
 	}
 	
-	printf("[app] Sending packets of size %d Bytes ", packet_size);
+	printf("[app] Sending %d packets of size %d Bytes ", max_cnt, packet_size);
 	if(buffer_size >= 2048)
 	{
 		printf("with a buffer of size %dKB ", buffer_size/1024); 
@@ -155,6 +176,7 @@ int main(int argc, char *argv[])
 	{
 		printf("with single packet buffering "); 
 	}
+	printf("and a timeout of %dms ", timeout_ms);
 	if(data_rate>0)
 	{
 		printf("at %d KBit/s.\n", data_rate);
@@ -199,7 +221,7 @@ int main(int argc, char *argv[])
 
 	bytes_written = malloc(sizeof(unsigned int));
 
-	struct generate_packets_context packetgen_context = {packet_size, buffer_size, data_rate, base_address, bytes_written, &packet_written, &buffer_ready};
+	struct generate_packets_context packetgen_context = {packet_size, buffer_size, timeout_ms, data_rate, base_address, bytes_written, &packet_written, &buffer_ready};
 	pthread_create(&packetgen_thread, NULL, generate_packets, &packetgen_context);
 
 	printf("[app] Sending packets...\n");
@@ -219,6 +241,9 @@ int main(int argc, char *argv[])
 
 		//wait on worker thread to finish
 		sem_wait(&packet_written);
+		
+		//increment packet count
+		cnt += *((unsigned int *) shared_mem_s2h);
 
 		// 1. send length
 		mbox_put(&mb_in[HWT_S2H], (unsigned int) *bytes_written);
@@ -229,17 +254,16 @@ int main(int argc, char *argv[])
 		// 3. set next s2h shared mem addr
 		mbox_put(&mb_in[HWT_S2H], (unsigned int) shared_mem_s2h);
 
-		cnt++;
 		time_taken = calc_timediff_us(start, gettime());
 		latency_total += time_taken;
 		latency_max = max(latency_max, time_taken);
 		latency_min = min(latency_min, time_taken);
-		printf("Sent buffer no. %05d\n", cnt);
-
+		//printf("Sent buffer no. %05d\n", cnt);
+		buf_cnt++;
 	}
 
-	latency_avg = latency_total/cnt;
-	double data_rate_achieved = ((double) (cnt*(*bytes_written)))/((double) latency_total);
+	latency_avg = latency_total/buf_cnt;
+	double data_rate_achieved = ((double) (buf_cnt*(*bytes_written)))/((double) latency_total);
 	data_rate_achieved *= 1000.0*8.0/(1.024); //convert from bytes/us to KBit/s
 	printf("\n\n[app] Performance results:\n\tData Rate: %.1f KBit/s\n\tLatency:\n\t\tavg: %dus \n\t\tmin: %dus \n\t\tmax: %dus", data_rate_achieved, (int) latency_avg, (int) latency_min, (int) latency_max);
 

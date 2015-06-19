@@ -30,6 +30,7 @@ void *generate_packets(void * context)
 	struct noc_header * head_ptr;
 	struct generate_packets_context * c = (struct generate_packets_context *) context;
 	us_t period = 0;
+	us_t timeout = 1000*c->timeout_ms;
 	us_t time_taken = 0, surplus = 0;
 	timing_t period_start;
 
@@ -54,21 +55,30 @@ void *generate_packets(void * context)
 		double packet_rate = 128.0*((double) c->data_rate)/((double) c->packet_size); //packets/s
 		period = (us_t) (num_packets*(1000000.0/packet_rate)); //usecs/buffer
 	}
+
+	//adjust period and number of packets sent per buffer if period is too long
+	if(period > timeout)
+	{
+		printf("did the thing\n");
+		unsigned int num_packets_new = (unsigned int) (((double) num_packets) * ((double) timeout) / ((double) period));
+		period = (period*num_packets_new)/num_packets;
+		num_packets = num_packets_new;
+	}
+
 	for(;;)
 	{
 		period_start = gettime();
 		sem_wait(c->buffer_ready);
+		time_taken = 0;
 		*c->bytes_written = 0;
 
-		//setup write pointers and write num_packets
+		//setup write pointers
 		word_ptr = (unsigned int *) *(c->base_address);
-		*word_ptr = num_packets;
-		word_ptr += 1;
-		head_ptr = (struct noc_header *) word_ptr;
+		head_ptr = (struct noc_header *) (word_ptr + 1);
 		ptr = ((unsigned char *) head_ptr) + 12;
 
 		//fill buffer with packets
-		for(i=0; i<num_packets; i++)
+		for(i=0; i < num_packets; i++)
 		{
 			//write packet
 			*head_ptr = header;
@@ -80,20 +90,23 @@ void *generate_packets(void * context)
 			head_ptr = (struct noc_header *) ptr;
 			ptr += 12;
 		}
+		
+		//write num_packets written
+		*word_ptr = i;
 
-		//take into account how much we missed the previous goal
-		time_taken = calc_timediff_us(period_start, gettime()) + surplus;
+		//calculate time taken so far
+		time_taken = calc_timediff_us(period_start, gettime());
 
 		//throttle to desired data rate, would like to use usleep/nanosleep but microblaze does not handle it well
-		while(time_taken < period)
+		while(time_taken + surplus < period)
 		{
 			time_taken = calc_timediff_us(period_start, gettime());
 		}
 
 		//we took too long, so make up for it in the following iteration
-		if(time_taken > period)
+		if(time_taken + surplus > period)
 		{
-			surplus = time_taken - period;
+			surplus += time_taken - period;
 		} else {
 			surplus = 0;
 		}

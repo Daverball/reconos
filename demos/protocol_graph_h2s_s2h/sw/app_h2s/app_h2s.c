@@ -121,18 +121,18 @@ int main(int argc, char *argv[])
 	)
 	{
 		printf("Usage: ./app_h2s [buffer_size] [timeout] [num_packets]\n");
-		printf("\tbuffer_size:\tbuffer size in kB\t(default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
-		printf("\tnote: 1kB turns on single packet buffering.\n\n");
-		printf("\ttimeout:\ttimeout in ms\t(default value: %d)\n", DEFAULT_TIMEOUT_MS);
-		printf("\tnum_packets:\thow many packets to receive\t(default value: %d)\n", DEFAULT_PACKETS_TO_RECEIVE);
+		printf("\tbuffer_size:\tbuffer size in KB (default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
+		printf("\t\t\t(note:) 1 turns on single packet buffering.\n\n");
+		printf("\ttimeout:\ttimeout in ms (default value: %d)\n", DEFAULT_TIMEOUT_MS);
+		printf("\tnum_packets:\thow many packets to receive (default value: %d)\n", DEFAULT_PACKETS_TO_RECEIVE);
 		return 0;
 	}
 	
-	if(argc > 1 && atoi(argv[1])>0 && atoi(argv[1])<65 )// 1KB -> single packet buffering
+	if(argc > 1 && atoi(argv[1])>0)// 1KB -> single packet buffering
 	{
 		buffer_size = 1024*atoi(argv[1]);
 	} else {
-		printf("[app] Received no valid buffer size in kB for argument 1, using default.\n");
+		printf("[app] Received no valid buffer size in KB for argument 1, using default.\n");
 	}
 
 	if(argc > 2 && atoi(argv[2])>0)
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
 	printf("[app] Receving %d packets ", max_cnt);
 	if(buffer_size >= 2048)
 	{
-		printf("with a buffer of size %dkB ", buffer_size/1024); 
+		printf("with a buffer of size %dKB ", buffer_size/1024); 
 	}
 	else //single packet buffering
 	{

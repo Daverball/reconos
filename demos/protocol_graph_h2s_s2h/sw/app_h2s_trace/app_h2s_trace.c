@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
 	unsigned int total_bytes_received=0;
 
 	//performance timing variables
-	ms_t time_taken, total_time_taken = 0;
+	ms_t time_taken, total_time_taken = 0, surplus = 0;
 	timing_t start;
 
 	printf( "-------------------------------------------------------\n"
@@ -123,11 +123,11 @@ int main(int argc, char *argv[])
 	)
 	{
 		printf("Usage: ./app_h2s_trace [buffer_size] [timeout] [duration] [timestep]\n");
-		printf("\tbuffer_size:\tbuffer size in kB\t(default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
-		printf("\tnote: 1kB turns on single packet buffering.\n\n");
-		printf("\ttimeout:\ttimeout in ms\t(default value: %d)\n", DEFAULT_TIMEOUT_MS);
-		printf("\tduration:\tduration of trace in s\t(default value: %d)\n", DEFAULT_DURATION_S);
-		printf("\ttimestep:\ttimestep between measurements in ms\t(default value: %d)\n", DEFAULT_TIMESTEP_MS);
+		printf("\tbuffer_size:\tbuffer size in KB (default value %d)\n", DEFAULT_BUFFER_SIZE/1024);
+		printf("\t\t\t(note:) 1 turns on single packet buffering.\n\n");
+		printf("\ttimeout:\ttimeout in ms (default value: %d)\n", DEFAULT_TIMEOUT_MS);
+		printf("\tduration:\tduration of trace in s (default value: %d)\n", DEFAULT_DURATION_S);
+		printf("\ttimestep:\ttimestep between measurements in ms (default value: %d)\n", DEFAULT_TIMESTEP_MS);
 		return 0;
 	}
 	
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
 	{
 		buffer_size = 1024*atoi(argv[1]);
 	} else {
-		printf("[app] Received no valid buffer size in kB for argument 1, using default.\n");
+		printf("[app] Received no valid buffer size in KB for argument 1, using default.\n");
 	}
 
 	if(argc > 2 && atoi(argv[2])>0)
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
 	printf("[app] Starting trace for %ds with timesteps of %dms ", (int) duration_ms/1000, (int) timestep_ms);
 	if(buffer_size >= 2048)
 	{
-		printf("with a buffer of size %dkB ", buffer_size/1024); 
+		printf("with a buffer of size %dKB ", buffer_size/1024); 
 	}
 	else //single packet buffering
 	{
@@ -231,9 +231,10 @@ int main(int argc, char *argv[])
 		}
 		time_taken = calc_timediff_ms(start, gettime());
 
-		if(time_taken >= timestep_ms)
+		if(time_taken + surplus >= timestep_ms)
 		{
 			start = gettime();
+			surplus += time_taken - timestep_ms;
 			total_time_taken += time_taken;
 			double data_rate_achieved = ((double) (total_bytes_received))/((double) time_taken);
 			data_rate_achieved *= 8.0/(1.024); //convert from bytes/ms to KBit/s
